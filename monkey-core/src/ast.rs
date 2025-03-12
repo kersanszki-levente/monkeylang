@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use core::fmt::Debug;
 use core::fmt::Display;
 use std::ops::Deref;
@@ -114,7 +112,7 @@ impl PartialEq for Value {
 }
 
 #[derive(Debug, Clone, Eq)]
-pub(crate) enum Statement {
+pub enum Statement {
     Let(Identifier, Expr),
     Return(Expr),
     Expression(Expr),
@@ -213,7 +211,7 @@ impl From<Statement> for String {
 // EXPRESSIONS
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub(crate) struct Identifier {
+pub struct Identifier {
     value: String,
 }
 
