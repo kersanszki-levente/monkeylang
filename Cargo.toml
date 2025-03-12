@@ -1,0 +1,17 @@
+[package]
+name = "monkeylang"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = [
+    "monkey-core",
+    "repl",
+]
+
+[[bin]]
+name = "repl"
+path = "repl/src/main.rs"
+
+[profile.release]
+codegen-units=1
