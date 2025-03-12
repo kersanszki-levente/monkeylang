@@ -267,7 +267,6 @@ impl Parser {
     fn parse_function_literal(&mut self) -> ParserResult<Expr> {
         self.expect_next(TokenType::Lparen)?;
         let parameters = self.parse_function_parameters()?;
-        // println!("Parsed function literal parameters = {parameters:?}");
 
         self.expect_next(TokenType::Lbrace)?;
         let body = self.parse_block_statement()?;
@@ -329,7 +328,6 @@ impl Parser {
             self.next_token();
             args.push(self.parse_expression(OperatorPrecedence::Lowest)?);
         }
-        // println!("Call expression arguments = {args:?}");
 
         self.expect_next(TokenType::Rparen)?;
 

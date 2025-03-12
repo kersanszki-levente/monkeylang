@@ -90,7 +90,7 @@ fn is_return_statement(result: &EvaluationResult) -> bool {
 impl Evaluate for Value {
     fn eval(&self, env: MutableEnvironment) -> EvaluationResult {
         match self {
-            Value::Return(expr) => { println!("Eval return stmt"); expr.eval(env)},
+            Value::Return(expr) => expr.eval(env),
             Value::Expression(expr) => expr.eval(env),
             _ => Ok(self.clone())
         }
@@ -444,7 +444,6 @@ mod tests {
         ];
 
         for (func_input, expected_return_value) in test_cases {
-            println!("Testing {func_input}");
             let lexer = Lexer::new(func_input);
             let mut parser = Parser::new(lexer);
             let env = Rc::new(RefCell::new(Environment::new(None)));
