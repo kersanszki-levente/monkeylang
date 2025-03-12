@@ -1,13 +1,11 @@
 #![allow(unused_imports)]
 
-use core::cell::RefCell;
 use std::io::{
     stdin,
     BufRead,
     BufReader,
     Write,
 };
-use std::rc::Rc;
 
 use termcolor::{
     Color,
@@ -46,7 +44,7 @@ fn execute_command(mut output: &mut StandardStream, line: &str) -> Result<(), st
     Ok(())
 }
 
-fn execute_line(mut output: &mut StandardStream, line: &str, env: MutableEnvironment) -> Result<(), std::io::Error> {
+fn execute_line(mut output: &mut StandardStream, line: &str, env: &mut Environment) -> Result<(), std::io::Error> {
     let lexer = Lexer::new(line);
     let mut parser = Parser::new(lexer);
 
@@ -77,7 +75,7 @@ fn start() -> Result<(), std::io::Error> {
     let mut output = StandardStream::stdout(ColorChoice::Always);
 
     prompt(&mut output)?;
-    let env = Rc::new(RefCell::new(Environment::new(None)));
+    let mut env = Environment::new(None);
 
     for result in buffer.lines() {
 
@@ -87,7 +85,7 @@ fn start() -> Result<(), std::io::Error> {
         } else if line.starts_with(".") {
             execute_command(&mut output, &line)?;
         } else {
-            execute_line(&mut output, &line, env.clone())?;
+            execute_line(&mut output, &line, &mut env)?;
         };
 
         prompt(&mut output)?;

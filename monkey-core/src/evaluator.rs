@@ -1,7 +1,9 @@
-use core::cell::RefCell;
+#![allow(unused_imports)]
+
 use core::result::Result;
 use core::fmt::Debug;
-use std::rc::Rc;
+use std::cell::RefCell;
+use std::rc::{Rc, Weak};
 
 use crate::ast::Boolean;
 use crate::ast::CallExpression;
@@ -16,7 +18,6 @@ use crate::ast::Program;
 use crate::ast::Statement;
 use crate::ast::Value;
 use crate::environment::Environment;
-use crate::environment::MutableEnvironment;
 use crate::token::TokenType;
 
 pub struct EvaluationError(String);
@@ -30,14 +31,14 @@ impl Debug for EvaluationError {
 type EvaluationResult=Result<Value, EvaluationError>;
 
 pub trait Evaluate {
-    fn eval(&self, env: MutableEnvironment) -> EvaluationResult;
+    fn eval(&self, env: &mut Environment) -> EvaluationResult;
 }
 
 impl Evaluate for Program {
-    fn eval(&self, env: MutableEnvironment) -> EvaluationResult {
+    fn eval(&self, env: &mut Environment) -> EvaluationResult {
         let mut result = Value::Null;
         for stmt in self.statements.iter() {
-            result = stmt.eval(env.clone())?;
+            result = stmt.eval(env)?;
             if let Value::Return(value) = result {
                 return Ok(Value::Return(value))
             } else {
@@ -49,14 +50,12 @@ impl Evaluate for Program {
 }
 
 impl Evaluate for Statement {
-    fn eval(&self, env: MutableEnvironment) -> EvaluationResult {
+    fn eval(&self, env: &mut Environment) -> EvaluationResult {
         match self {
             Statement::Let(id, expr) => {
-                let value = expr.eval(env.clone())?;
+                let value = expr.eval(env)?;
                 let id = id.to_string();
                 env
-                    .try_borrow_mut()
-                    .map_err(|_| EvaluationError(format!("Interpreter error: Could not access variable {id}")))?
                     .set(id, value);
                 Ok(Value::Null)
             },
@@ -65,7 +64,7 @@ impl Evaluate for Statement {
             Statement::Block(exprs) => {
                 let mut values = exprs
                     .iter()
-                    .map(|expr| -> EvaluationResult { expr.eval(env.clone()) })
+                    .map(|expr| -> EvaluationResult { expr.eval(env) })
                     .peekable();
                 if let Some(return_value) = values.next_if(is_return_statement) {
                     return return_value
@@ -88,7 +87,7 @@ fn is_return_statement(result: &EvaluationResult) -> bool {
 }
 
 impl Evaluate for Value {
-    fn eval(&self, env: MutableEnvironment) -> EvaluationResult {
+    fn eval(&self, env: &mut Environment) -> EvaluationResult {
         match self {
             Value::Return(expr) => expr.eval(env),
             Value::Expression(expr) => expr.eval(env),
@@ -98,21 +97,21 @@ impl Evaluate for Value {
 }
 
 impl Evaluate for Integer {
-    fn eval(&self, _: MutableEnvironment) -> EvaluationResult {
+    fn eval(&self, _: &mut Environment) -> EvaluationResult {
         Ok(self.value())
     }
 }
 
 impl Evaluate for Boolean {
-    fn eval(&self, _: MutableEnvironment) -> EvaluationResult {
+    fn eval(&self, _: &mut Environment) -> EvaluationResult {
         Ok(self.value())
     }
 }
 
 impl Evaluate for InfixExpr {
-    fn eval(&self, env: MutableEnvironment) -> EvaluationResult {
+    fn eval(&self, env: &mut Environment) -> EvaluationResult {
         let left_value = match &self.left {
-            Value::Expression(left_expr) => left_expr.eval(env.clone())?,
+            Value::Expression(left_expr) => left_expr.eval(env)?,
             _ => self.left.clone(),
         };
         let right_value = match &self.right {
@@ -156,18 +155,16 @@ impl Evaluate for InfixExpr {
 }
 
 impl Evaluate for Identifier {
-    fn eval(&self, env: MutableEnvironment) -> EvaluationResult {
+    fn eval(&self, env: &mut Environment) -> EvaluationResult {
         let id = self.literal();
         env
-            .try_borrow()
-            .map_err(|_| EvaluationError(format!("Compiler error: Could not fetch var {id}")))?
             .get(id)
             .ok_or(EvaluationError(format!("{} is not a variable", self.literal())))
     }
 }
 
 impl Evaluate for PrefixedExpr {
-    fn eval(&self, env: MutableEnvironment) -> EvaluationResult {
+    fn eval(&self, env: &mut Environment) -> EvaluationResult {
         let right = self.right.eval(env)?;
         match self.operator {
             TokenType::Bang => eval_bang_operator(&right),
@@ -195,19 +192,19 @@ fn eval_minus_operator(value: &Value) -> EvaluationResult {
 }
 
 impl Evaluate for IfExpr {
-    fn eval(&self, env: MutableEnvironment) -> EvaluationResult {
-        let condition_value = self.condition.eval(env.clone())?;
-        if is_condition_true(condition_value, env.clone())? {
+    fn eval(&self, env: &mut Environment) -> EvaluationResult {
+        let condition_value = self.condition.eval(env)?;
+        if is_condition_true(condition_value, env)? {
             self.consequence.eval(env)
         } else if let Some(alternative) = self.alternative.as_ref() {
-            alternative.eval(env.clone())
+            alternative.eval(env)
         } else {
             Ok(Value::Null)
         }
     }
 }
 
-fn is_condition_true(condition_value: Value, env: MutableEnvironment) -> core::result::Result<bool, EvaluationError> {
+fn is_condition_true(condition_value: Value, env: &mut Environment) -> core::result::Result<bool, EvaluationError> {
     let value = match condition_value {
         Value::Expression(expr) => expr.eval(env)?,
         _ => condition_value,
@@ -220,47 +217,48 @@ fn is_condition_true(condition_value: Value, env: MutableEnvironment) -> core::r
 }
 
 impl Evaluate for FunctionLiteral {
-    fn eval(&self, env: MutableEnvironment) -> EvaluationResult {
-        Ok(Value::Function(Box::new(self.body.clone()), Box::new(self.parameters.clone()), env))
+    fn eval(&self, env: &mut Environment) -> EvaluationResult {
+        Ok(Value::Function(Box::new(self.body.clone()), Box::new(self.parameters.clone()), Rc::new(RefCell::new(env.clone()))))
     }
 }
 
 impl Evaluate for CallExpression {
-    fn eval(&self, env: MutableEnvironment) -> EvaluationResult {
-        let function = self.function.eval(env.clone())?;
+    fn eval(&self, env: &mut Environment) -> EvaluationResult {
+        let function = self.function.eval(env)?;
         let args = self
             .arguments
             .iter()
-            .map(|arg| arg.eval(env.clone()))
+            .map(|arg| arg.eval(env))
             .collect::<Result<Vec<Value>, EvaluationError>>()?;
-        apply_function(&function, &args, env)
+        apply_function(&function, &args)
     }
 }
 
-fn apply_function(func: &Value, args: &[Value], _: MutableEnvironment) -> EvaluationResult {
+fn apply_function(func: &Value, args: &[Value]) -> EvaluationResult {
     match func {
         f @ Value::Function(stmt, _, _) => {
-            let function_env = extend_function_env(f, args)?;
-            let value = stmt.eval(function_env.clone())?;
-            unwrap_return_value(&value, function_env)
+            let mut function_env = extend_function_env(f, args)?;
+            let value = stmt.eval(&mut function_env)?;
+            unwrap_return_value(&value)
         },
         _ => Err(EvaluationError(format!("Evaluation error: {func} is not callable")))
     }
 }
 
-fn extend_function_env(func: &Value, args: &[Value]) -> std::result::Result<MutableEnvironment, EvaluationError> {
+fn extend_function_env(func: &Value, args: &[Value]) -> std::result::Result<Environment, EvaluationError> {
     if let Value::Function(_, arguments, func_env) = func {
-        let mut function_env = Environment::new(Some(func_env.clone()));
+        let outer_env = Rc::downgrade(func_env);
+        let mut function_env = Environment::new(Some(outer_env));
         for (parameter, argument) in arguments.iter().zip(args.iter()) {
             function_env.set(parameter.literal().to_string(), argument.clone());
         }
-        Ok(Rc::new(RefCell::new(function_env)))
+        Ok(function_env)
     } else {
         Err(EvaluationError("Value is not a function".to_string()))
     }
 }
 
-fn unwrap_return_value(value: &Value, _: MutableEnvironment) -> EvaluationResult {
+fn unwrap_return_value(value: &Value) -> EvaluationResult {
     if let Value::Return(expr) = value {
         Ok(*expr.clone())
     } else {
@@ -270,9 +268,6 @@ fn unwrap_return_value(value: &Value, _: MutableEnvironment) -> EvaluationResult
 
 #[cfg(test)]
 mod tests {
-    use core::cell::RefCell;
-    use std::rc::Rc;
-
     use super::*;
 
     use crate::{ast::Expr, lexer::Lexer, parser::Parser};
@@ -287,9 +282,9 @@ mod tests {
         program.statements.push(statement);
 
         let expected = Value::Int(10);
-        let env = Rc::new(RefCell::new(Environment::new(None)));
+        let mut env = Environment::new(None);
 
-        assert_eq!(program.eval(env).unwrap(), expected);
+        assert_eq!(program.eval(&mut env).unwrap(), expected);
     }
 
     #[test]
@@ -300,9 +295,9 @@ mod tests {
         let statement = Statement::Expression(one);
 
         let expected = Value::Int(10);
-        let env = Rc::new(RefCell::new(Environment::new(None)));
+        let mut env = Environment::new(None);
 
-        assert_eq!(statement.eval(env).unwrap(), expected);
+        assert_eq!(statement.eval(&mut env).unwrap(), expected);
     }
 
     #[test]
@@ -321,9 +316,9 @@ mod tests {
             let mut parser = Parser::new(lexer);
             let program = parser.parse();
 
-            let env = Rc::new(RefCell::new(Environment::new(None)));
+            let mut env = Environment::new(None);
 
-            assert_eq!(program.eval(env).unwrap(), expected_value);
+            assert_eq!(program.eval(&mut env).unwrap(), expected_value);
         }
     }
 
@@ -357,9 +352,9 @@ mod tests {
             let lexer = Lexer::new(func_input);
             let mut parser = Parser::new(lexer);
             let program = parser.parse();
-            let env = Rc::new(RefCell::new(Environment::new(None)));
+            let mut env = Environment::new(None);
 
-            assert_eq!(program.eval(env).unwrap(), expected_value);
+            assert_eq!(program.eval(&mut env).unwrap(), expected_value);
         }
     }
 
@@ -379,9 +374,9 @@ mod tests {
             let lexer = Lexer::new(func_input);
             let mut parser = Parser::new(lexer);
             let program = parser.parse();
-            let env = Rc::new(RefCell::new(Environment::new(None)));
+            let mut env = Environment::new(None);
 
-            assert_eq!(program.eval(env).unwrap(), expected_value);
+            assert_eq!(program.eval(&mut env).unwrap(), expected_value);
         }
     }
 
@@ -396,8 +391,8 @@ mod tests {
 
         for (func_input, expectation) in test_cases {
             let lexer = Lexer::new(func_input);
-            let env = Rc::new(RefCell::new(Environment::new(None)));
-            let program = Parser::new(lexer).parse().eval(env).unwrap();
+            let mut env = Environment::new(None);
+            let program = Parser::new(lexer).parse().eval(&mut env).unwrap();
             assert_eq!(program, expectation);
         }
     }
@@ -413,8 +408,8 @@ mod tests {
 
         for (func_input, expectation) in test_cases {
             let lexer = Lexer::new(func_input);
-            let env = Rc::new(RefCell::new(Environment::new(None)));
-            let program = Parser::new(lexer).parse().eval(env).unwrap();
+            let mut env = Environment::new(None);
+            let program = Parser::new(lexer).parse().eval(&mut env).unwrap();
             assert_eq!(program, expectation);
         }
     }
@@ -424,13 +419,13 @@ mod tests {
 
         let func_input = "fn(x) { x + 2 };";
         let lexer = Lexer::new(func_input);
-        let env = Rc::new(RefCell::new(Environment::new(None)));
-        let program = Parser::new(lexer).parse().eval(env.clone()).unwrap();
+        let mut env = Environment::new(None);
+        let program = Parser::new(lexer).parse().eval(&mut env).unwrap();
 
         let offset_value: Expr = Box::new(Integer::new(2));
         let func_var: Expr = Box::new(Identifier::new("x"));
         let body = Statement::Expression(Box::new(InfixExpr::new(TokenType::Plus, &func_var, &offset_value)));
-        let expectation = Value::Function(Box::new(Statement::Block(vec![body])), Box::new(vec![Identifier::new("x")]), env);
+        let expectation = Value::Function(Box::new(Statement::Block(vec![body])), Box::new(vec![Identifier::new("x")]), Rc::new(RefCell::new(env)));
         assert_eq!(program, expectation);
     }
 
@@ -446,9 +441,21 @@ mod tests {
         for (func_input, expected_return_value) in test_cases {
             let lexer = Lexer::new(func_input);
             let mut parser = Parser::new(lexer);
-            let env = Rc::new(RefCell::new(Environment::new(None)));
-            let return_value = parser.parse().eval(env).unwrap();
+            let program = parser.parse();
+            let mut env = Environment::new(None);
+            let return_value = program.eval(&mut env).unwrap();
             assert_eq!(return_value, expected_return_value);
         }
+    }
+
+    #[test]
+    fn test_recursive_evaluation() {
+        let code = "let fib = fn(n) { if (n == 1) { return n } else { return fib(n-1) + fib(n-2)} }; fib(5)";
+        let lexer = Lexer::new(code);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+        let mut env = Environment::new(None);
+        let return_value = program.eval(&mut env).unwrap();
+        assert_eq!(return_value, Value::Int(5));
     }
 }

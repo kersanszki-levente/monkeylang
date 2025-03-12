@@ -1,8 +1,12 @@
+#![allow(unused_imports)]
+
 use core::fmt::Debug;
 use core::fmt::Display;
 use std::ops::Deref;
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::environment::MutableEnvironment;
+use crate::environment::Environment;
 use crate::evaluator::Evaluate;
 use crate::token::TokenType;
 
@@ -32,14 +36,14 @@ impl Eq for Expr {
     fn assert_receiver_is_total_eq(&self) {}
 }
 
-#[derive(Debug, Clone, Eq)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Str(String),
     Int(i64),
     Bool(bool),
     Expression(Expr),
     Return(Box<Value>),
-    Function(Box<Statement>, Box<Vec<Identifier>>, MutableEnvironment),
+    Function(Box<Statement>, Box<Vec<Identifier>>, Rc<RefCell<Environment>>),
     Null,
 }
 
@@ -109,6 +113,10 @@ impl PartialEq for Value {
             Self::Null => true,
         }
     }
+}
+
+impl Eq for Value {
+    fn assert_receiver_is_total_eq(&self) {}
 }
 
 #[derive(Debug, Clone, Eq)]

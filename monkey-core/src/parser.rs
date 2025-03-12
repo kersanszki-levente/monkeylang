@@ -420,7 +420,6 @@ mod tests {
             Statement::Return(Box::new(Integer::new(5))),
             Statement::Return(Box::new(Identifier::new("y"))),
             Statement::Return(Box::new(Integer::new(838383))),
-            // Statement::Return(Box::new(Identifier::new(""))),
         ];
 
         assert_eq!(test_cases.len(), program.statements.len());
