@@ -53,7 +53,8 @@ fn execute_line(mut output: &mut StandardStream, line: &str, env: MutableEnviron
     let program = parser.parse();
     if let Some(err) = parser.errors.first() {
         output.set_color(ColorSpec::new().set_fg(Some(Color::Rgb(255, 0, 0))))?;
-        writeln!(&mut output, "{:?}", err)?;
+        writeln!(&mut output, "{}", err)?;
+        return Ok(())
     };
     match program.eval(env) {
         Ok(result) => {
