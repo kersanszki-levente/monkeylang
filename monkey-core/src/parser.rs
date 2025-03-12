@@ -62,7 +62,7 @@ impl From<String> for ParserError {
 
 impl Display for ParserError {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Encountered invalid item at parsing. {}", self.0)
+        write!(f, "{}", self.0)
     }
 }
 
@@ -164,7 +164,7 @@ impl Parser {
             TokenType::Lparen => self.parse_grouped_expression()?,
             TokenType::If => self.parse_if_expression()?,
             TokenType::Function => self.parse_function_literal()?,
-            _ => return Err(ParserError(format!("There are no prefix parsers for {:?}", self.cur_token.r#type)))
+            _ => return Err(ParserError(format!("{} is not a valid operator", self.cur_token.r#type)))
         };
         while !self.next_token_is(&TokenType::Semicolon) && precedence < self.next_precedence() {
             let next_token_type = self.next_token.r#type.clone();
