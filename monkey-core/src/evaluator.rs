@@ -346,6 +346,8 @@ mod tests {
             ("5 < 5", Value::Bool(false)),
             ("5 == 5", Value::Bool(true)),
             ("5 != 5", Value::Bool(false)),
+            ("let t = fn() { return true }; t() == true", Value::Bool(true)),
+            ("let t = fn() { return true }; t() != true", Value::Bool(false)),
         ];
 
         for (func_input, expected_value) in test_cases {
