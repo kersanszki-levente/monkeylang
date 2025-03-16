@@ -156,6 +156,17 @@ impl Evaluate for InfixExpr {
                     },
                     _ => Err(EvaluationError("Cannot mix bools with other types".to_string()))
                 }
+            },
+            Value::Str(left) => {
+                match right_value {
+                    Value::Str(right) => {
+                        match self.operator {
+                            TokenType::Plus => Ok(Value::Str(format!("{left}{right}"))),
+                            _ => Err(EvaluationError(format!("{} is not a valid operator for two strings", self.operator)))
+                        }
+                    },
+                    _ => Err(EvaluationError("Cannot mix strings with other types".to_string()))
+                }
             }
             _ => unimplemented!()
         }
@@ -484,5 +495,16 @@ mod tests {
         let env = Environment::new_shared(None);
         let return_value = program.eval(&env).unwrap();
         assert_eq!(return_value, Value::Int(1));
+    }
+
+    #[test]
+    fn test_string_concatenation_evaluation() {
+        let code = "\"Hello\" + \" \" + \"World\"";
+        let lexer = Lexer::new(code);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+        let env = Environment::new_shared(None);
+        let return_value = program.eval(&env).unwrap();
+        assert_eq!(return_value, Value::Str("Hello World".to_string()));
     }
 }
