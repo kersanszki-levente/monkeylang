@@ -5,8 +5,11 @@ use core::fmt::Display;
 use std::ops::Deref;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::rc::Weak;
 
+use crate::environment::CallerEnvironment;
 use crate::environment::Environment;
+use crate::environment::SharedEnvironment;
 use crate::evaluator::Evaluate;
 use crate::token::TokenType;
 
@@ -43,7 +46,7 @@ pub enum Value {
     Bool(bool),
     Expression(Expr),
     Return(Box<Value>),
-    Function(Box<Statement>, Box<Vec<Identifier>>, Rc<RefCell<Environment>>),
+    Function(Box<Statement>, Box<Vec<Identifier>>, SharedEnvironment),
     Null,
 }
 

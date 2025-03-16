@@ -17,7 +17,7 @@ use termcolor::{
 
 use monkey_core::ast::Value;
 use monkey_core::environment::Environment;
-use monkey_core::environment::MutableEnvironment;
+use monkey_core::environment::SharedEnvironment;
 use monkey_core::evaluator::Evaluate;
 use monkey_core::lexer::Lexer;
 use monkey_core::parser::Parser;
@@ -44,7 +44,7 @@ fn execute_command(mut output: &mut StandardStream, line: &str) -> Result<(), st
     Ok(())
 }
 
-fn execute_line(mut output: &mut StandardStream, line: &str, env: &mut Environment) -> Result<(), std::io::Error> {
+fn execute_line(mut output: &mut StandardStream, line: &str, env: &SharedEnvironment) -> Result<(), std::io::Error> {
     let lexer = Lexer::new(line);
     let mut parser = Parser::new(lexer);
 
@@ -75,7 +75,7 @@ fn start() -> Result<(), std::io::Error> {
     let mut output = StandardStream::stdout(ColorChoice::Always);
 
     prompt(&mut output)?;
-    let mut env = Environment::new(None);
+    let env = Environment::new_shared(None);
 
     for result in buffer.lines() {
 
@@ -85,7 +85,7 @@ fn start() -> Result<(), std::io::Error> {
         } else if line.starts_with(".") {
             execute_command(&mut output, &line)?;
         } else {
-            execute_line(&mut output, &line, &mut env)?;
+            execute_line(&mut output, &line, &env)?;
         };
 
         prompt(&mut output)?;
