@@ -36,6 +36,8 @@ impl From<TokenType> for OperatorPrecedence {
             TokenType::NotEq => OperatorPrecedence::Equals,
             TokenType::Lt => OperatorPrecedence::LessGreater,
             TokenType::Gt => OperatorPrecedence::LessGreater,
+            TokenType::LtE => OperatorPrecedence::LessGreater,
+            TokenType::GtE => OperatorPrecedence::LessGreater,
             TokenType::Plus => OperatorPrecedence::Sum,
             TokenType::Minus => OperatorPrecedence::Sum,
             TokenType::Slash => OperatorPrecedence::Product,
@@ -178,7 +180,9 @@ impl Parser {
                 | TokenType::Eq
                 | TokenType::NotEq
                 | TokenType::Lt
-                | TokenType::Gt => {
+                | TokenType::Gt
+                | TokenType::LtE
+                | TokenType::GtE => {
                     self.next_token();
                     self.parse_infix_expression(left_expr)?
                 },
@@ -543,6 +547,8 @@ mod tests {
             ("5 < 5", InfixExpr::new(TokenType::Lt, &left, &right)),
             ("5 == 5", InfixExpr::new(TokenType::Eq, &left, &right)),
             ("5 != 5", InfixExpr::new(TokenType::NotEq, &left, &right)),
+            ("5 <= 5", InfixExpr::new(TokenType::LtE, &left, &right)),
+            ("5 >= 5", InfixExpr::new(TokenType::GtE, &left, &right)),
         ];
 
         for (input, expected_expression) in test_cases {

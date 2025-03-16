@@ -139,6 +139,8 @@ impl Evaluate for InfixExpr {
                             TokenType::Lt => Ok(Value::Bool(left < right)),
                             TokenType::Eq => Ok(Value::Bool(left == right)),
                             TokenType::NotEq => Ok(Value::Bool(left != right)),
+                            TokenType::LtE => Ok(Value::Bool(left <= right)),
+                            TokenType::GtE => Ok(Value::Bool(left >= right)),
                             _ => Err(EvaluationError(format!("{} is not a valid operator for two integers", self.operator)))
                         }
                     },
@@ -366,6 +368,12 @@ mod tests {
             ("5 < 5", Value::Bool(false)),
             ("5 == 5", Value::Bool(true)),
             ("5 != 5", Value::Bool(false)),
+            ("10 >= 10", Value::Bool(true)),
+            ("10 >= 9", Value::Bool(true)),
+            ("9 >= 10", Value::Bool(false)),
+            ("10 <= 10", Value::Bool(true)),
+            ("10 <= 9", Value::Bool(false)),
+            ("9 <= 10", Value::Bool(true)),
             ("let t = fn() { return true }; t() == true", Value::Bool(true)),
             ("let t = fn() { return true }; t() != true", Value::Bool(false)),
         ];
@@ -377,6 +385,7 @@ mod tests {
             let env = Environment::new_shared(None);
 
             assert_eq!(program.eval(&env).unwrap(), expected_value);
+            println!("{func_input}");
         }
     }
 
@@ -473,9 +482,8 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_recursive_evaluation() {
-        let code = "let fib = fn(n) { if (n == 1) { return 1 } else { fib(n-1) + fib(n-2)} }; fib(5)";
+        let code = "let fib = fn(n) { if (n <= 1) { return n } else { return fib(n-1) + fib(n-2)} }; fib(5)";
         let lexer = Lexer::new(code);
         let mut parser = Parser::new(lexer);
         let program = parser.parse();

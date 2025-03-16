@@ -89,8 +89,22 @@ impl Lexer {
                 },
                 '/' => Token{ r#type: TokenType::Slash, literal: None },
                 '*' => Token{ r#type: TokenType::Asterisk, literal: None },
-                '<' => Token{ r#type: TokenType::Lt, literal: None },
-                '>' => Token{ r#type: TokenType::Gt, literal: None },
+                '<' => {
+                    if self.peek_char() == Some('=') {
+                        self.read_char();
+                        Token{ r#type: TokenType::LtE, literal: None }
+                    } else {
+                        Token{ r#type: TokenType::Lt, literal: None }
+                    }
+                },
+                '>' => {
+                    if self.peek_char() == Some('=') {
+                        self.read_char();
+                        Token{ r#type: TokenType::GtE, literal: None }
+                    } else {
+                        Token{ r#type: TokenType::Gt, literal: None }
+                    }
+                },
                 ';' => Token{ r#type: TokenType::Semicolon, literal: None },
                 '(' => Token{ r#type: TokenType::Lparen, literal: None },
                 ')' => Token{ r#type: TokenType::Rparen, literal: None },
@@ -169,6 +183,9 @@ mod tests {
                        10 != 9;
                        "foobar";
                        "foo bar";
+
+                       10 <= 9;
+                       10 >= 9;
         "#;
         let test_cases: Vec<TestCase> = vec![
             TestCase { expected_type: TokenType::Let, expected_literal: None },
@@ -247,6 +264,14 @@ mod tests {
             TestCase { expected_type: TokenType::String, expected_literal: Some("foobar".to_string()) },
             TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
             TestCase { expected_type: TokenType::String, expected_literal: Some("foo bar".to_string()) },
+            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
+            TestCase { expected_type: TokenType::Int, expected_literal: Some("10".to_string()) },
+            TestCase { expected_type: TokenType::LtE, expected_literal: None },
+            TestCase { expected_type: TokenType::Int, expected_literal: Some("9".to_string()) },
+            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
+            TestCase { expected_type: TokenType::Int, expected_literal: Some("10".to_string()) },
+            TestCase { expected_type: TokenType::GtE, expected_literal: None },
+            TestCase { expected_type: TokenType::Int, expected_literal: Some("9".to_string()) },
             TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
             TestCase { expected_type: TokenType::EOF, expected_literal: None },
         ];

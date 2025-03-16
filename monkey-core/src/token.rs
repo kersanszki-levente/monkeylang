@@ -37,6 +37,8 @@ pub enum TokenType {
 
     Eq,
     NotEq,
+    LtE,
+    GtE,
 }
 
 impl Display for TokenType {
@@ -70,6 +72,8 @@ impl Display for TokenType {
             TokenType::Return => "return",
             TokenType::Eq => "==",
             TokenType::NotEq => "!=",
+            TokenType::LtE => "<=",
+            TokenType::GtE => ">=",
         };
         write!(f, "{}", literal)
     }
