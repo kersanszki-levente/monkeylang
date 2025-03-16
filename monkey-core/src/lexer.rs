@@ -9,11 +9,13 @@ pub struct Lexer {
 }
 
 impl Lexer {
+
     pub fn new(input: &str) -> Self {
         let mut lexer = Lexer { input: input.to_owned(), position: 0, read_position: 0, ch: None };
         lexer.read_char();
         lexer
     }
+
     fn read_char(&mut self) {
         if self.read_position == self.input.chars().count() {
             self.ch = None
@@ -23,14 +25,17 @@ impl Lexer {
         self.position = self.read_position;
         self.read_position += 1;
     }
+
     fn peek_char(&self) -> Option<char> {
         self.input.chars().nth(self.read_position)
     }
+
     fn skip_whitespace(&mut self) {
         while self.ch == Some(' ') || self.ch == Some('\t') || self.ch == Some('\n') || self.ch == Some('\r') {
             self.read_char();
         }
     }
+
     fn read_identifier(&mut self) -> Option<&str> {
         let position = self.position;
         while self.ch.is_some_and(|ch| ch.is_alphabetic()) {
@@ -38,6 +43,7 @@ impl Lexer {
         };
         self.input.get(position..self.position)
     }
+
     fn read_number(&mut self) -> Option<&str> {
         let position = self.position;
         while self.ch.is_some_and(|ch| ch.is_numeric()) {
@@ -45,6 +51,18 @@ impl Lexer {
         };
         self.input.get(position..self.position)
     }
+
+    fn read_string(&mut self) -> Option<String> {
+        let position = self.position + 1;
+        loop {
+            self.read_char();
+            if self.ch == Some('"') || self.ch.is_none() {
+                break
+            }
+        }
+        self.input.get(position..self.position).map(|s| s.to_owned())
+    }
+
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
 
@@ -79,6 +97,7 @@ impl Lexer {
                 ',' => Token{ r#type: TokenType::Comma, literal: None },
                 '{' => Token{ r#type: TokenType::Lbrace, literal: None },
                 '}' => Token{ r#type: TokenType::Rbrace, literal: None },
+                '"' => Token{ r#type: TokenType::String, literal: self.read_string() },
                 _ => {
                     if next_char.is_alphabetic() {
                         let literal = self.read_identifier();
@@ -148,6 +167,8 @@ mod tests {
 
                        10 == 10;
                        10 != 9;
+                       "foobar";
+                       "foo bar";
         "#;
         let test_cases: Vec<TestCase> = vec![
             TestCase { expected_type: TokenType::Let, expected_literal: None },
@@ -222,6 +243,10 @@ mod tests {
             TestCase { expected_type: TokenType::Int, expected_literal: Some("10".to_string()) },
             TestCase { expected_type: TokenType::NotEq, expected_literal: None },
             TestCase { expected_type: TokenType::Int, expected_literal: Some("9".to_string()) },
+            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
+            TestCase { expected_type: TokenType::String, expected_literal: Some("foobar".to_string()) },
+            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
+            TestCase { expected_type: TokenType::String, expected_literal: Some("foo bar".to_string()) },
             TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
             TestCase { expected_type: TokenType::EOF, expected_literal: None },
         ];

@@ -17,6 +17,7 @@ use crate::ast::Integer;
 use crate::ast::PrefixedExpr;
 use crate::ast::Program;
 use crate::ast::Statement;
+use crate::ast::StringLiteral;
 use crate::ast::Value;
 use crate::environment::Environment;
 use crate::environment::SharedEnvironment;
@@ -101,6 +102,12 @@ impl Evaluate for Value {
 }
 
 impl Evaluate for Integer {
+    fn eval(&self, _: &SharedEnvironment) -> EvaluationResult {
+        Ok(self.value())
+    }
+}
+
+impl Evaluate for StringLiteral {
     fn eval(&self, _: &SharedEnvironment) -> EvaluationResult {
         Ok(self.value())
     }

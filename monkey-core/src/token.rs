@@ -7,6 +7,7 @@ pub enum TokenType {
 
     Ident,
     Int,
+    String,
 
     Assign,
     Plus,
@@ -45,6 +46,7 @@ impl Display for TokenType {
             TokenType::EOF => "",
             TokenType::Ident => unimplemented!(),
             TokenType::Int => unimplemented!(),
+            TokenType::String => unimplemented!(),
             TokenType::Assign => "=",
             TokenType::Plus => "+",
             TokenType::Minus => "-",

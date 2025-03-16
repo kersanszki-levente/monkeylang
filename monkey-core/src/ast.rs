@@ -345,6 +345,38 @@ impl Expression for Integer {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+pub(crate) struct StringLiteral {
+    value: String
+}
+
+impl StringLiteral {
+    pub(crate) fn new(value: String) -> StringLiteral {
+        StringLiteral { value }
+    }
+}
+
+impl Display for StringLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+impl Expression for StringLiteral {
+    fn value(&self) -> Value {
+        Value::Str(self.value.clone())
+    }
+    fn token_type(&self) -> TokenType {
+        TokenType::String
+    }
+    fn literal(&self) -> &str {
+        &self.value
+    }
+    fn box_clone(&self) -> Box<dyn Expression> {
+        Box::new((*self).clone())
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct PrefixedExpr {
     pub(crate) operator: TokenType,
     pub(crate) right: Value,

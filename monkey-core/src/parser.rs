@@ -13,6 +13,7 @@ use crate::ast::Integer;
 use crate::ast::PrefixedExpr;
 use crate::ast::Program;
 use crate::ast::Statement;
+use crate::ast::StringLiteral;
 use crate::lexer::Lexer;
 use crate::token::Token;
 use crate::token::TokenType;
@@ -158,6 +159,7 @@ impl Parser {
         let mut left_expr: Expr = match self.cur_token.r#type {
             TokenType::Ident => Box::new(self.parse_identifier()),
             TokenType::Int => Box::new(self.parse_integer_literal()?),
+            TokenType::String => Box::new(self.parse_string_literal()?),
             TokenType::Minus | TokenType::Bang => self.parse_prefix_expression()?,
             TokenType::True => Box::new(Boolean::new(true)),
             TokenType::False => Box::new(Boolean::new(false)),
@@ -204,6 +206,14 @@ impl Parser {
             None => return Err(ParserError("Failed to parse integer".to_string())),
         };
         Ok(Integer::new(value))
+    }
+
+    fn parse_string_literal(&self) -> ParserResult<StringLiteral> {
+        if let Some(literal) = &self.cur_token.literal {
+            Ok(StringLiteral::new(literal.to_string()))
+        } else {
+            Err(ParserError("Failed to parse string".to_string()))
+        }
     }
 
     fn parse_grouped_expression(&mut self) -> ParserResult<Expr> {
@@ -475,6 +485,23 @@ mod tests {
 
         let expected = crate::ast::Program { statements: vec![
             crate::ast::Statement::Expression(Box::new(crate::ast::Boolean::new(true))),
+        ] };
+        assert_eq!(program, expected);
+    }
+
+    #[test]
+    fn test_string_expression() {
+        // valid statements
+        let input = "\"hello world\"";
+
+        let l = Lexer::new(input);
+        let mut p = Parser::new(l);
+        let program = p.parse();
+
+        assert_eq!(program.statements.len(), 1);
+
+        let expected = crate::ast::Program { statements: vec![
+            crate::ast::Statement::Expression(Box::new(crate::ast::StringLiteral::new("hello world".to_string()))),
         ] };
         assert_eq!(program, expected);
     }
