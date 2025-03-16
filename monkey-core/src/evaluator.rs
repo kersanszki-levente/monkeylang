@@ -1,10 +1,7 @@
-#![allow(unused_imports)]
-
 use core::result::Result;
 use core::fmt::Debug;
 use std::cell::RefCell;
-use std::ops::Deref;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
 use crate::ast::Boolean;
 use crate::ast::CallExpression;
