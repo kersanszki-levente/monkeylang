@@ -5,7 +5,7 @@ An implementation of monkey based on the book [Writing an Interpreter in Go](htt
 * Primitive types: bools and integers.
 * Prefix (!, -) and infix (+, -, *, /, &, |, >, <) operators.
 * Storing expression results as variables.
-* Functions and closures.
+* Functions, closures and recursion.
 
 ## REPL
 
