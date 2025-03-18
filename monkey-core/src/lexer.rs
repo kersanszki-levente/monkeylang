@@ -111,6 +111,8 @@ impl Lexer {
                 ',' => Token{ r#type: TokenType::Comma, literal: None },
                 '{' => Token{ r#type: TokenType::Lbrace, literal: None },
                 '}' => Token{ r#type: TokenType::Rbrace, literal: None },
+                '[' => Token{ r#type: TokenType::Lbracket, literal: None },
+                ']' => Token{ r#type: TokenType::Rbracket, literal: None },
                 '"' => Token{ r#type: TokenType::String, literal: self.read_string() },
                 _ => {
                     if next_char.is_alphabetic() {
@@ -186,6 +188,7 @@ mod tests {
 
                        10 <= 9;
                        10 >= 9;
+                       [1, 2];
         "#;
         let test_cases: Vec<TestCase> = vec![
             TestCase { expected_type: TokenType::Let, expected_literal: None },
@@ -272,6 +275,12 @@ mod tests {
             TestCase { expected_type: TokenType::Int, expected_literal: Some("10".to_string()) },
             TestCase { expected_type: TokenType::GtE, expected_literal: None },
             TestCase { expected_type: TokenType::Int, expected_literal: Some("9".to_string()) },
+            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
+            TestCase { expected_type: TokenType::Lbracket, expected_literal: None },
+            TestCase { expected_type: TokenType::Int, expected_literal: Some("1".to_string()) },
+            TestCase { expected_type: TokenType::Comma, expected_literal: None },
+            TestCase { expected_type: TokenType::Int, expected_literal: Some("2".to_string()) },
+            TestCase { expected_type: TokenType::Rbracket, expected_literal: None },
             TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
             TestCase { expected_type: TokenType::EOF, expected_literal: None },
         ];
