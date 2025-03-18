@@ -3,6 +3,7 @@ use core::fmt::Debug;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::ast::ArrayLiteral;
 use crate::ast::Boolean;
 use crate::ast::CallExpression;
 use crate::ast::Expression;
@@ -113,6 +114,12 @@ impl Evaluate for StringLiteral {
 impl Evaluate for Boolean {
     fn eval(&self, _: &SharedEnvironment) -> EvaluationResult {
         Ok(self.value())
+    }
+}
+
+impl Evaluate for ArrayLiteral {
+    fn eval(&self, _: &SharedEnvironment) -> EvaluationResult {
+        Ok(Value::Null)
     }
 }
 

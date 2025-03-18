@@ -2,6 +2,7 @@ use core::fmt::Display;
 use core::fmt::Formatter;
 use core::result::Result;
 
+use crate::ast::ArrayLiteral;
 use crate::ast::Boolean;
 use crate::ast::CallExpression;
 use crate::ast::Expr;
@@ -168,6 +169,7 @@ impl Parser {
             TokenType::Lparen => self.parse_grouped_expression()?,
             TokenType::If => self.parse_if_expression()?,
             TokenType::Function => self.parse_function_literal()?,
+            TokenType::Lbracket => Box::new(self.parse_array_literal()?),
             _ => return Err(ParserError(format!("{} is not a valid operator", self.cur_token.r#type)))
         };
         while !self.next_token_is(&TokenType::Semicolon) && precedence < self.next_precedence() {
@@ -218,6 +220,34 @@ impl Parser {
         } else {
             Err(ParserError("Failed to parse string".to_string()))
         }
+    }
+
+    fn parse_array_literal(&mut self) -> ParserResult<ArrayLiteral> {
+        Ok(ArrayLiteral::new(self.parse_expression_list(TokenType::Rbracket)?))
+    }
+
+    fn parse_expression_list(&mut self, end: TokenType) -> ParserResult<Vec<Expr>> {
+        let mut results = vec![];
+
+        if self.next_token_is(&end) {
+            self.next_token();
+            return Ok(results)
+        }
+
+        self.next_token();
+        results.push(self.parse_expression(OperatorPrecedence::Lowest)?);
+
+        loop {
+            if !self.next_token_is(&TokenType::Comma) {
+                break
+            }
+            self.next_token();
+            self.next_token();
+            results.push(self.parse_expression(OperatorPrecedence::Lowest)?);
+        }
+
+        self.expect_next(end)?;
+        Ok(results)
     }
 
     fn parse_grouped_expression(&mut self) -> ParserResult<Expr> {
@@ -715,5 +745,38 @@ mod tests {
         ] };
 
         assert_eq!(program, expectation);
+    }
+
+    #[test]
+    fn test_parse_array_literal() {
+        let test_case = "[1, 2 * 2, 3 + 3]";
+        let l = Lexer::new(test_case);
+        let mut p = Parser::new(l);
+        let program = p.parse();
+
+        assert!(p.errors.is_empty());
+        assert_eq!(program.statements.len(), 1);
+
+        let first: Expr = Box::new(Integer::new(1));
+        let infix_left_item: Expr = Box::new(Integer::new(2));
+        let infix_right_item: Expr = Box::new(Integer::new(2));
+        let second: Expr = Box::new(InfixExpr::new(
+            TokenType::Asterisk,
+            &infix_left_item,
+            &infix_right_item,
+        ));
+        let arr = ArrayLiteral::new(vec![first, second]);
+        let expectation = Program { statements: vec![
+            Statement::Expression(Box::new(arr))
+        ]};
+
+        assert_eq!(program, expectation);
+
+        let test_case = "[1, ";
+        let l = Lexer::new(test_case);
+        let mut p = Parser::new(l);
+        let _ = p.parse();
+
+        assert!(!p.errors.is_empty());
     }
 }

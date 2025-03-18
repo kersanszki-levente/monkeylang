@@ -40,6 +40,7 @@ pub enum Value {
     Expression(Expr),
     Return(Box<Value>),
     Function(Box<Statement>, Box<Vec<Identifier>>, SharedEnvironment),
+    Array(Vec<Expr>),
     Null,
 }
 
@@ -52,6 +53,9 @@ impl Display for Value {
             Value::Expression(expr) => &format!("{expr}"),
             Value::Return(expr) => &format!("{expr}"),
             Value::Function(call_expr, _, _) => &format!("{call_expr}"),
+            Value::Array(elements) => {
+                &format!("[{}]", elements.iter().map(|e| format!("{e}")).collect::<Vec<String>>().join(","))
+            }
             Value::Null => "NULL",
         };
         write!(f, "{}", literal)
@@ -106,6 +110,14 @@ impl PartialEq for Value {
                     _ => false,
                 }
             },
+            Self::Array(left_elements) => {
+                match other {
+                    Self::Array(right_elements) => {
+                        left_elements.iter().zip(right_elements.iter()).all(|(l, r)| l == r)
+                    },
+                    _ => false,
+                }
+            }
             Self::Null => true,
         }
     }
@@ -363,6 +375,40 @@ impl Expression for StringLiteral {
     }
     fn literal(&self) -> &str {
         &self.value
+    }
+    fn box_clone(&self) -> Box<dyn Expression> {
+        Box::new((*self).clone())
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub(crate) struct ArrayLiteral {
+    pub(crate) elements: Vec<Expr>,
+    literal: String,
+}
+
+impl ArrayLiteral {
+    pub(crate) fn new(elements: Vec<Expr>) -> ArrayLiteral {
+        let literal = format!("[{}]", elements.iter().map(|e| format!("{e}")).collect::<Vec<String>>().join(","));
+        ArrayLiteral { elements, literal }
+    }
+}
+
+impl Display for ArrayLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}]", self.elements.iter().map(|e| format!("{e}")).collect::<Vec<String>>().join(","))
+    }
+}
+
+impl Expression for ArrayLiteral {
+    fn value(&self) -> Value {
+        Value::Array(self.elements.clone())
+    }
+    fn token_type(&self) -> TokenType {
+        TokenType::Lbracket
+    }
+    fn literal(&self) -> &str {
+        &self.literal
     }
     fn box_clone(&self) -> Box<dyn Expression> {
         Box::new((*self).clone())
