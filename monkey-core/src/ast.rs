@@ -417,8 +417,8 @@ impl Expression for ArrayLiteral {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct IndexExpression {
-    left: Value,
-    index: Value,
+    pub(crate) left: Value,
+    pub(crate) index: Value,
     literal: String,
 }
 

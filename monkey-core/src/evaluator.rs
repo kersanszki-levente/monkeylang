@@ -120,13 +120,29 @@ impl Evaluate for Boolean {
 
 impl Evaluate for ArrayLiteral {
     fn eval(&self, _: &SharedEnvironment) -> EvaluationResult {
-        Ok(Value::Null)
+        Ok(Value::Array(self.elements.clone()))
     }
 }
 
 impl Evaluate for IndexExpression {
-    fn eval(&self, _: &SharedEnvironment) -> EvaluationResult {
-        Ok(Value::Null)
+    fn eval(&self, env: &SharedEnvironment) -> EvaluationResult {
+        let left = self.left.eval(env)?;
+        let index = self.index.eval(env)?;
+        match left {
+            Value::Array(elements) => {
+                match index {
+                    Value::Int(index) => {
+                        if let Some(result) = elements.get(index as usize) {
+                            result.eval(env)
+                        } else {
+                            Err(EvaluationError(format!("index {index} is out of bounds")))
+                        }
+                    },
+                    _ => Err(EvaluationError(format!("{index} is not a valid index")))
+                }
+            },
+            _ => Err(EvaluationError(format!("{left} is not an array")))
+        }
     }
 }
 
@@ -527,5 +543,41 @@ mod tests {
         let env = Environment::new_shared(None);
         let return_value = program.eval(&env).unwrap();
         assert_eq!(return_value, Value::Str("Hello World".to_string()));
+    }
+
+    #[test]
+    fn test_index_expression_evaluation() {
+        let test_cases = vec![
+            ("[1, 2, 3][0]", Value::Int(1)),
+            ("[1, 2, 3][1]", Value::Int(2)),
+            ("[1, 2, 3][2]", Value::Int(3)),
+            ("let i = 0; [1][i];", Value::Int(1)),
+            ("[1, 2, 3][1 + 1]", Value::Int(3)),
+            ("let myArray = [1, 2, 3]; myArray[2];", Value::Int(3)),
+            ("let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];", Value::Int(6)),
+            ("let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i];", Value::Int(2)),
+        ];
+
+        for (source, expectation) in test_cases {
+            let lexer = Lexer::new(source);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse();
+            let env = Environment::new_shared(None);
+            let return_value = program.eval(&env).unwrap();
+            assert_eq!(return_value, expectation);
+        }
+
+        let err_cases = vec![
+            "[1, 2, 3][3]",
+            "[1, 2, 3][-1]",
+        ];
+
+        for source in err_cases {
+            let lexer = Lexer::new(source);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse();
+            let env = Environment::new_shared(None);
+            assert!(program.eval(&env).is_err());
+        }
     }
 }
