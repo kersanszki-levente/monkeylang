@@ -2,6 +2,7 @@ use core::fmt::Debug;
 use core::fmt::Display;
 use std::ops::Deref;
 
+use crate::builtin::BuiltinFunction;
 use crate::environment::SharedEnvironment;
 use crate::evaluator::Evaluate;
 use crate::token::TokenType;
@@ -41,6 +42,7 @@ pub enum Value {
     Return(Box<Value>),
     Function(Box<Statement>, Box<Vec<Identifier>>, SharedEnvironment),
     Array(Vec<Expr>),
+    Builtin(BuiltinFunction),
     Null,
 }
 
@@ -56,6 +58,7 @@ impl Display for Value {
             Value::Array(elements) => {
                 &format!("[{}]", elements.iter().map(|e| format!("{e}")).collect::<Vec<String>>().join(", "))
             }
+            Value::Builtin(_) => &format!("builtin function"),
             Value::Null => "NULL",
         };
         write!(f, "{}", literal)
@@ -118,6 +121,7 @@ impl PartialEq for Value {
                     _ => false,
                 }
             }
+            Self::Builtin(_) => false,
             Self::Null => true,
         }
     }

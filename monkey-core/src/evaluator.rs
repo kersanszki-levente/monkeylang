@@ -18,11 +18,12 @@ use crate::ast::Program;
 use crate::ast::Statement;
 use crate::ast::StringLiteral;
 use crate::ast::Value;
+use crate::builtin;
 use crate::environment::Environment;
 use crate::environment::SharedEnvironment;
 use crate::token::TokenType;
 
-pub struct EvaluationError(String);
+pub struct EvaluationError(pub(crate) String);
 
 impl Debug for EvaluationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -30,7 +31,7 @@ impl Debug for EvaluationError {
     }
 }
 
-type EvaluationResult=Result<Value, EvaluationError>;
+pub(crate) type EvaluationResult=Result<Value, EvaluationError>;
 
 pub trait Evaluate {
     fn eval(&self, env: &SharedEnvironment) -> EvaluationResult;
@@ -208,11 +209,17 @@ impl Evaluate for InfixExpr {
 impl Evaluate for Identifier {
     fn eval(&self, env: &SharedEnvironment) -> EvaluationResult {
         let id = self.literal();
-        env
+        if let Ok(value) = env
             .try_borrow()
             .map_err(|_| EvaluationError("Compiler error".to_string()))?
-            .get(id)
-            .map_err(|_| EvaluationError(format!("{} is not a variable", self.literal())))
+            .get(id) {
+            return Ok(value)
+        };
+        if let Ok(builtin) = builtin::get(id) {
+            Ok(Value::Builtin(builtin))
+        } else {
+            Err(EvaluationError(format!("{} is not a variable", self.literal())))
+        }
     }
 }
 
@@ -294,6 +301,7 @@ fn apply_function(func: &Value, args: &[Value]) -> EvaluationResult {
             let value = stmt.eval(&function_env)?;
             unwrap_return_value(&value)
         },
+        Value::Builtin(builtin_func) => builtin_func(args),
         _ => Err(EvaluationError(format!("Evaluation error: {func} is not callable")))
     }
 }
@@ -566,7 +574,6 @@ mod tests {
             let return_value = program.eval(&env).unwrap();
             assert_eq!(return_value, expectation);
         }
-
         let err_cases = vec![
             "[1, 2, 3][3]",
             "[1, 2, 3][-1]",
@@ -574,6 +581,36 @@ mod tests {
 
         for source in err_cases {
             let lexer = Lexer::new(source);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse();
+            let env = Environment::new_shared(None);
+            assert!(program.eval(&env).is_err());
+        }
+    }
+
+    #[test]
+    fn test_builtin_len_function_evaluation() {
+        let test_cases = vec![
+            ("len(\"\")", Value::Int(0)),
+            ("len(\"four\")", Value::Int(4)),
+            ("len(\"hello world\")", Value::Int(11)),
+        ];
+
+        for (code, expectation) in test_cases {
+            let lexer = Lexer::new(code);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse();
+            let env = Environment::new_shared(None);
+            let return_value = program.eval(&env).unwrap();
+            assert_eq!(return_value, expectation);
+        }
+
+        let invalid_test_cases = vec![
+            "len(1);", "len(\"one\", \"two\")"
+        ];
+
+        for code in invalid_test_cases {
+            let lexer = Lexer::new(code);
             let mut parser = Parser::new(lexer);
             let program = parser.parse();
             let env = Environment::new_shared(None);
