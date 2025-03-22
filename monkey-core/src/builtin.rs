@@ -13,6 +13,7 @@ fn len(args: &[Value]) -> EvaluationResult {
     let arg = args.first().unwrap();
     match arg {
         Value::Str(string) => Ok(Value::Int(string.len() as i64)),
+        Value::Array(elements) => Ok(Value::Int(elements.len() as i64)),
         _ => Err(EvaluationError("Argument to len not supported".to_string()))
     }
 }
