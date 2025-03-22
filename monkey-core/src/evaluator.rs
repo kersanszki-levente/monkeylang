@@ -10,6 +10,7 @@ use crate::ast::Expression;
 use crate::ast::FunctionLiteral;
 use crate::ast::Identifier;
 use crate::ast::IfExpr;
+use crate::ast::IndexExpression;
 use crate::ast::InfixExpr;
 use crate::ast::Integer;
 use crate::ast::PrefixedExpr;
@@ -118,6 +119,12 @@ impl Evaluate for Boolean {
 }
 
 impl Evaluate for ArrayLiteral {
+    fn eval(&self, _: &SharedEnvironment) -> EvaluationResult {
+        Ok(Value::Null)
+    }
+}
+
+impl Evaluate for IndexExpression {
     fn eval(&self, _: &SharedEnvironment) -> EvaluationResult {
         Ok(Value::Null)
     }
@@ -392,7 +399,6 @@ mod tests {
             let env = Environment::new_shared(None);
 
             assert_eq!(program.eval(&env).unwrap(), expected_value);
-            println!("{func_input}");
         }
     }
 

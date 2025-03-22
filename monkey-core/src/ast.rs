@@ -54,7 +54,7 @@ impl Display for Value {
             Value::Return(expr) => &format!("{expr}"),
             Value::Function(call_expr, _, _) => &format!("{call_expr}"),
             Value::Array(elements) => {
-                &format!("[{}]", elements.iter().map(|e| format!("{e}")).collect::<Vec<String>>().join(","))
+                &format!("[{}]", elements.iter().map(|e| format!("{e}")).collect::<Vec<String>>().join(", "))
             }
             Value::Null => "NULL",
         };
@@ -389,20 +389,59 @@ pub(crate) struct ArrayLiteral {
 
 impl ArrayLiteral {
     pub(crate) fn new(elements: Vec<Expr>) -> ArrayLiteral {
-        let literal = format!("[{}]", elements.iter().map(|e| format!("{e}")).collect::<Vec<String>>().join(","));
+        let literal = format!("[{}]", elements.iter().map(|e| format!("{e}")).collect::<Vec<String>>().join(", "));
         ArrayLiteral { elements, literal }
     }
 }
 
 impl Display for ArrayLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}]", self.elements.iter().map(|e| format!("{e}")).collect::<Vec<String>>().join(","))
+        write!(f, "[{}]", self.elements.iter().map(|e| format!("{e}")).collect::<Vec<String>>().join(", "))
     }
 }
 
 impl Expression for ArrayLiteral {
     fn value(&self) -> Value {
         Value::Array(self.elements.clone())
+    }
+    fn token_type(&self) -> TokenType {
+        TokenType::Lbracket
+    }
+    fn literal(&self) -> &str {
+        &self.literal
+    }
+    fn box_clone(&self) -> Box<dyn Expression> {
+        Box::new((*self).clone())
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub(crate) struct IndexExpression {
+    left: Value,
+    index: Value,
+    literal: String,
+}
+
+impl IndexExpression {
+    pub(crate) fn new(left: Expr, index: Expr) -> IndexExpression {
+        let literal = format!("({left}[{index}])");
+        IndexExpression {
+            left: Value::Expression(left.clone()),
+            index: Value::Expression(index.clone()),
+            literal
+        }
+    }
+}
+
+impl Display for IndexExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}[{}])", self.left, self.index)
+    }
+}
+
+impl Expression for IndexExpression {
+    fn value(&self) -> Value {
+        Value::Int(1)
     }
     fn token_type(&self) -> TokenType {
         TokenType::Lbracket
