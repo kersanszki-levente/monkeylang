@@ -18,6 +18,7 @@ use crate::ast::Program;
 use crate::ast::Statement;
 use crate::ast::StringLiteral;
 use crate::ast::Value;
+use crate::ast::ValueIdentity;
 use crate::builtin;
 use crate::environment::Environment;
 use crate::environment::SharedEnvironment;
@@ -98,6 +99,12 @@ impl Evaluate for Value {
             Value::Expression(expr) => expr.eval(env),
             v => Ok(v.clone())
         }
+    }
+}
+
+impl Evaluate for ValueIdentity {
+    fn eval(&self, _: &SharedEnvironment) -> EvaluationResult {
+        Ok(self.value.clone())
     }
 }
 

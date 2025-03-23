@@ -132,6 +132,47 @@ impl Eq for Value {
 }
 
 #[derive(Debug, Clone, Eq)]
+pub struct ValueIdentity {
+    pub(crate) value: Value,
+    literal: String,
+}
+
+impl PartialEq for ValueIdentity {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+
+impl ValueIdentity {
+    pub(crate) fn new(value: Value) -> ValueIdentity {
+        let literal = format!("{}", value);
+        ValueIdentity { value, literal }
+    }
+}
+
+impl Display for ValueIdentity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+impl Expression for ValueIdentity {
+    fn value(&self) -> Value {
+        self.value.clone()
+    }
+    fn token_type(&self) -> TokenType {
+        TokenType::Function
+    }
+    fn literal(&self) -> &str {
+        &self.literal
+    }
+    fn box_clone(&self) -> Box<dyn Expression> {
+        Box::new((*self).clone())
+    }
+}
+
+
+#[derive(Debug, Clone, Eq)]
 pub enum Statement {
     Let(Identifier, Expr),
     Return(Expr),

@@ -1,10 +1,20 @@
 use std::result::Result;
 
+use crate::ast::Expr;
 use crate::ast::Value;
+use crate::ast::ValueIdentity;
 use crate::evaluator::EvaluationError;
 use crate::evaluator::EvaluationResult;
 
 pub(crate) type BuiltinFunction=fn(args: &[Value]) -> EvaluationResult;
+
+fn assert_argument_length(args: &[Value], expected_arguments_length: usize) -> Result<(), EvaluationError> {
+    if args.len() != expected_arguments_length {
+        Err(EvaluationError(format!("Expected {expected_arguments_length} arguments, got {}", args.len())))
+    } else {
+        Ok(())
+    }
+}
 
 fn len(args: &[Value]) -> EvaluationResult {
     if args.len() != 1 {
@@ -55,12 +65,26 @@ fn rest(args: &[Value]) -> EvaluationResult {
     }
 }
 
+fn push(args: &[Value]) -> EvaluationResult {
+    assert_argument_length(args, 2)?;
+    let arr = args.first().unwrap();
+    let new: Expr = Box::new(ValueIdentity::new(args.get(1).unwrap().clone()));
+    if let Value::Array(elements) = arr {
+        let mut elements = elements.clone();
+        elements.push(new);
+        Ok(Value::Array(elements))
+    } else {
+        Err(EvaluationError("Argument to last is not supported".to_string()))
+    }
+}
+
 pub(crate) fn get(name: &str) -> Result<BuiltinFunction, EvaluationError> {
     let func = match name {
         "len" => len,
         "first" => first,
         "last" => last,
         "rest" => rest,
+        "push" => push,
         _ => return Err(EvaluationError(format!("{name} is not a known function")))
     };
     Ok(func)
@@ -78,6 +102,9 @@ mod tests {
         let lexer = Lexer::new(code);
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
+
+        assert!(parser.errors.is_empty());
+
         let env = Environment::new_shared(None);
         program.eval(&env).unwrap()
     }
@@ -131,6 +158,18 @@ mod tests {
             ("rest([])", Value::Array(Vec::new())),
             ("rest([1])", Value::Array(Vec::new())),
             ("rest([1, 2])", Value::Array(vec![Box::new(crate::ast::Integer::new(2))])),
+        ];
+        for (source, expectation) in test_cases {
+            let return_value = evaluate_code(source);
+            assert_eq!(return_value, expectation);
+        }
+    }
+
+    #[test]
+    fn test_push_function_evaluation() {
+        let test_cases = vec![
+            ("push([], 1);", Value::Array(vec![Box::new(crate::ast::ValueIdentity::new(Value::Int(1)))])),
+            ("let arr = []; push(arr, 1);", Value::Array(vec![Box::new(crate::ast::ValueIdentity::new(Value::Int(1)))])),
         ];
         for (source, expectation) in test_cases {
             let return_value = evaluate_code(source);
