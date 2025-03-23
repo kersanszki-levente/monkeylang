@@ -18,9 +18,21 @@ fn len(args: &[Value]) -> EvaluationResult {
     }
 }
 
+fn first(args: &[Value]) -> EvaluationResult {
+    if args.len() != 1 {
+        return Err(EvaluationError(format!("Expected 1 arguments, got {}", args.len())))
+    }
+    let arg = args.first().unwrap();
+    match arg {
+        Value::Array(elements) => Ok(elements.first().map_or_else(|| Value::Null, |e| Value::Expression(e.clone()))),
+        _ => Err(EvaluationError("Argument to first is not supported".to_string()))
+    }
+}
+
 pub(crate) fn get(name: &str) -> Result<BuiltinFunction, EvaluationError> {
     let func = match name {
         "len" => len,
+        "first" => first,
         _ => return Err(EvaluationError(format!("{name} is not a known function")))
     };
     Ok(func)
@@ -34,6 +46,14 @@ mod tests {
     use crate::lexer::Lexer;
     use crate::parser::Parser;
 
+    fn evaluate_code(code: &str) -> Value {
+        let lexer = Lexer::new(code);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+        let env = Environment::new_shared(None);
+        program.eval(&env).unwrap()
+    }
+
     #[test]
     fn test_len_function_evaluation() {
         let test_cases = vec![
@@ -46,11 +66,20 @@ mod tests {
         ];
 
         for (code, expectation) in test_cases {
-            let lexer = Lexer::new(code);
-            let mut parser = Parser::new(lexer);
-            let program = parser.parse();
-            let env = Environment::new_shared(None);
-            let return_value = program.eval(&env).unwrap();
+            let return_value = evaluate_code(code);
+            assert_eq!(return_value, expectation);
+        }
+    }
+
+    #[test]
+    fn test_first_function_evaluation() {
+        let test_cases = vec![
+            ("first([])", Value::Null),
+            ("first([1])", Value::Expression(Box::new(crate::ast::Integer::new(1)))),
+            ("first([1, 2])", Value::Expression(Box::new(crate::ast::Integer::new(1)))),
+        ];
+        for (source, expectation) in test_cases {
+            let return_value = evaluate_code(source);
             assert_eq!(return_value, expectation);
         }
     }
