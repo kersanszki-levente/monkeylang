@@ -53,6 +53,12 @@ fn prompt(mut output: &mut StandardStream) -> Result<(), std::io::Error> {
     Ok(())
 }
 
+fn print_err(mut output: &mut StandardStream, message: impl Display) -> Result<(), std::io::Error> {
+    output.set_color(ColorSpec::new().set_fg(Some(Color::Rgb(255, 0, 0))))?;
+    writeln!(&mut output, "{}", message)?;
+    Ok(())
+}
+
 fn execute_command(mut output: &mut StandardStream, line: &str) -> Result<(), std::io::Error> {
     match line {
         ".help" => writeln!(&mut output, "{}", HELP)?,
@@ -68,8 +74,7 @@ fn execute_line(mut output: &mut StandardStream, line: &str, env: &SharedEnviron
 
     let program = parser.parse();
     if let Some(err) = parser.errors.first() {
-        output.set_color(ColorSpec::new().set_fg(Some(Color::Rgb(255, 0, 0))))?;
-        writeln!(&mut output, "{}", err)?;
+        print_err(output, err)?;
         return Ok(())
     };
     match program.eval(env) {
@@ -79,10 +84,7 @@ fn execute_line(mut output: &mut StandardStream, line: &str, env: &SharedEnviron
                 _ => writeln!(&mut output, "{}", result)?,
             }
         },
-        Err(err) => {
-            output.set_color(ColorSpec::new().set_fg(Some(Color::Rgb(255, 0, 0))))?;
-            writeln!(&mut output, "{:?}", err)?;
-        },
+        Err(err) => print_err(output, err)?,
     };
 
     Ok(())
