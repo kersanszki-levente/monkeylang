@@ -26,6 +26,8 @@ pub enum TokenType {
     Rparen,
     Lbrace,
     Rbrace,
+    Lbracket,
+    Rbracket,
 
     Function,
     Let,
@@ -63,6 +65,8 @@ impl Display for TokenType {
             TokenType::Rparen => ")",
             TokenType::Lbrace => "{",
             TokenType::Rbrace => "}",
+            TokenType::Lbracket => "[",
+            TokenType::Rbracket => "]",
             TokenType::Function => "fn",
             TokenType::Let => "let",
             TokenType::True => "true",

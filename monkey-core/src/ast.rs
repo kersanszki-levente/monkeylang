@@ -41,6 +41,7 @@ pub enum Value {
     Expression(Expr),
     Return(Box<Value>),
     Function(Box<Statement>, Box<Vec<Identifier>>, SharedEnvironment),
+    Array(Vec<Expr>),
     Builtin(BuiltinFunction),
     Null,
 }
@@ -54,6 +55,9 @@ impl Display for Value {
             Value::Expression(expr) => &format!("{expr}"),
             Value::Return(expr) => &format!("{expr}"),
             Value::Function(call_expr, _, _) => &format!("{call_expr}"),
+            Value::Array(elements) => {
+                &format!("[{}]", elements.iter().map(|e| format!("{e}")).collect::<Vec<String>>().join(", "))
+            }
             Value::Builtin(_) => &format!("builtin function"),
             Value::Null => "NULL",
         };
@@ -109,6 +113,14 @@ impl PartialEq for Value {
                     _ => false,
                 }
             },
+            Self::Array(left_elements) => {
+                match other {
+                    Self::Array(right_elements) => {
+                        left_elements.iter().zip(right_elements.iter()).all(|(l, r)| l == r)
+                    },
+                    _ => false,
+                }
+            }
             Self::Builtin(_) => false,
             Self::Null => true,
         }
@@ -118,6 +130,47 @@ impl PartialEq for Value {
 impl Eq for Value {
     fn assert_receiver_is_total_eq(&self) {}
 }
+
+#[derive(Debug, Clone, Eq)]
+pub struct ValueIdentity {
+    pub(crate) value: Value,
+    literal: String,
+}
+
+impl PartialEq for ValueIdentity {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+
+impl ValueIdentity {
+    pub(crate) fn new(value: Value) -> ValueIdentity {
+        let literal = format!("{}", value);
+        ValueIdentity { value, literal }
+    }
+}
+
+impl Display for ValueIdentity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+impl Expression for ValueIdentity {
+    fn value(&self) -> Value {
+        self.value.clone()
+    }
+    fn token_type(&self) -> TokenType {
+        TokenType::Function
+    }
+    fn literal(&self) -> &str {
+        &self.literal
+    }
+    fn box_clone(&self) -> Box<dyn Expression> {
+        Box::new((*self).clone())
+    }
+}
+
 
 #[derive(Debug, Clone, Eq)]
 pub enum Statement {
@@ -367,6 +420,79 @@ impl Expression for StringLiteral {
     }
     fn literal(&self) -> &str {
         &self.value
+    }
+    fn box_clone(&self) -> Box<dyn Expression> {
+        Box::new((*self).clone())
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub(crate) struct ArrayLiteral {
+    pub(crate) elements: Vec<Expr>,
+    literal: String,
+}
+
+impl ArrayLiteral {
+    pub(crate) fn new(elements: Vec<Expr>) -> ArrayLiteral {
+        let literal = format!("[{}]", elements.iter().map(|e| format!("{e}")).collect::<Vec<String>>().join(", "));
+        ArrayLiteral { elements, literal }
+    }
+}
+
+impl Display for ArrayLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}]", self.elements.iter().map(|e| format!("{e}")).collect::<Vec<String>>().join(", "))
+    }
+}
+
+impl Expression for ArrayLiteral {
+    fn value(&self) -> Value {
+        Value::Array(self.elements.clone())
+    }
+    fn token_type(&self) -> TokenType {
+        TokenType::Lbracket
+    }
+    fn literal(&self) -> &str {
+        &self.literal
+    }
+    fn box_clone(&self) -> Box<dyn Expression> {
+        Box::new((*self).clone())
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub(crate) struct IndexExpression {
+    pub(crate) left: Value,
+    pub(crate) index: Value,
+    literal: String,
+}
+
+impl IndexExpression {
+    pub(crate) fn new(left: Expr, index: Expr) -> IndexExpression {
+        let literal = format!("({left}[{index}])");
+        IndexExpression {
+            left: Value::Expression(left.clone()),
+            index: Value::Expression(index.clone()),
+            literal
+        }
+    }
+}
+
+impl Display for IndexExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}[{}])", self.left, self.index)
+    }
+}
+
+impl Expression for IndexExpression {
+    fn value(&self) -> Value {
+        Value::Int(1)
+    }
+    fn token_type(&self) -> TokenType {
+        TokenType::Lbracket
+    }
+    fn literal(&self) -> &str {
+        &self.literal
     }
     fn box_clone(&self) -> Box<dyn Expression> {
         Box::new((*self).clone())

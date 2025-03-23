@@ -3,12 +3,14 @@ use core::fmt::Debug;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::ast::ArrayLiteral;
 use crate::ast::Boolean;
 use crate::ast::CallExpression;
 use crate::ast::Expression;
 use crate::ast::FunctionLiteral;
 use crate::ast::Identifier;
 use crate::ast::IfExpr;
+use crate::ast::IndexExpression;
 use crate::ast::InfixExpr;
 use crate::ast::Integer;
 use crate::ast::PrefixedExpr;
@@ -16,6 +18,7 @@ use crate::ast::Program;
 use crate::ast::Statement;
 use crate::ast::StringLiteral;
 use crate::ast::Value;
+use crate::ast::ValueIdentity;
 use crate::builtin;
 use crate::environment::Environment;
 use crate::environment::SharedEnvironment;
@@ -99,6 +102,12 @@ impl Evaluate for Value {
     }
 }
 
+impl Evaluate for ValueIdentity {
+    fn eval(&self, _: &SharedEnvironment) -> EvaluationResult {
+        Ok(self.value.clone())
+    }
+}
+
 impl Evaluate for Integer {
     fn eval(&self, _: &SharedEnvironment) -> EvaluationResult {
         Ok(self.value())
@@ -114,6 +123,34 @@ impl Evaluate for StringLiteral {
 impl Evaluate for Boolean {
     fn eval(&self, _: &SharedEnvironment) -> EvaluationResult {
         Ok(self.value())
+    }
+}
+
+impl Evaluate for ArrayLiteral {
+    fn eval(&self, _: &SharedEnvironment) -> EvaluationResult {
+        Ok(Value::Array(self.elements.clone()))
+    }
+}
+
+impl Evaluate for IndexExpression {
+    fn eval(&self, env: &SharedEnvironment) -> EvaluationResult {
+        let left = self.left.eval(env)?;
+        let index = self.index.eval(env)?;
+        match left {
+            Value::Array(elements) => {
+                match index {
+                    Value::Int(index) => {
+                        if let Some(result) = elements.get(index as usize) {
+                            result.eval(env)
+                        } else {
+                            Err(EvaluationError(format!("index {index} is out of bounds")))
+                        }
+                    },
+                    _ => Err(EvaluationError(format!("{index} is not a valid index")))
+                }
+            },
+            _ => Err(EvaluationError(format!("{left} is not an array")))
+        }
     }
 }
 
@@ -393,7 +430,6 @@ mod tests {
             let env = Environment::new_shared(None);
 
             assert_eq!(program.eval(&env).unwrap(), expected_value);
-            println!("{func_input}");
         }
     }
 
@@ -525,33 +561,37 @@ mod tests {
     }
 
     #[test]
-    fn test_builtin_len_function_evaluation() {
+    fn test_index_expression_evaluation() {
         let test_cases = vec![
-            ("len(\"\")", Value::Int(0)),
-            ("len(\"four\")", Value::Int(4)),
-            ("len(\"hello world\")", Value::Int(11)),
+            ("[1, 2, 3][0]", Value::Int(1)),
+            ("[1, 2, 3][1]", Value::Int(2)),
+            ("[1, 2, 3][2]", Value::Int(3)),
+            ("let i = 0; [1][i];", Value::Int(1)),
+            ("[1, 2, 3][1 + 1]", Value::Int(3)),
+            ("let myArray = [1, 2, 3]; myArray[2];", Value::Int(3)),
+            ("let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];", Value::Int(6)),
+            ("let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i];", Value::Int(2)),
         ];
 
-        for (code, expectation) in test_cases {
-            let lexer = Lexer::new(code);
+        for (source, expectation) in test_cases {
+            let lexer = Lexer::new(source);
             let mut parser = Parser::new(lexer);
             let program = parser.parse();
             let env = Environment::new_shared(None);
             let return_value = program.eval(&env).unwrap();
             assert_eq!(return_value, expectation);
         }
-
-        let invalid_test_cases = vec![
-            "len(1);", "len(\"one\", \"two\")"
+        let err_cases = vec![
+            "[1, 2, 3][3]",
+            "[1, 2, 3][-1]",
         ];
 
-        for code in invalid_test_cases {
-            let lexer = Lexer::new(code);
+        for source in err_cases {
+            let lexer = Lexer::new(source);
             let mut parser = Parser::new(lexer);
             let program = parser.parse();
             let env = Environment::new_shared(None);
             assert!(program.eval(&env).is_err());
         }
-
     }
 }

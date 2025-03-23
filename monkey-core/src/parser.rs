@@ -2,12 +2,14 @@ use core::fmt::Display;
 use core::fmt::Formatter;
 use core::result::Result;
 
+use crate::ast::ArrayLiteral;
 use crate::ast::Boolean;
 use crate::ast::CallExpression;
 use crate::ast::Expr;
 use crate::ast::FunctionLiteral;
 use crate::ast::Identifier;
 use crate::ast::IfExpr;
+use crate::ast::IndexExpression;
 use crate::ast::InfixExpr;
 use crate::ast::Integer;
 use crate::ast::PrefixedExpr;
@@ -27,6 +29,7 @@ enum OperatorPrecedence {
     Product,     // *
     Prefix,      // -X or !X
     Call,        // fn(x)
+    Index,       // array[index]
 }
 
 impl From<TokenType> for OperatorPrecedence {
@@ -43,6 +46,7 @@ impl From<TokenType> for OperatorPrecedence {
             TokenType::Slash => OperatorPrecedence::Product,
             TokenType::Asterisk => OperatorPrecedence::Product,
             TokenType::Lparen => OperatorPrecedence::Call,
+            TokenType::Lbracket => OperatorPrecedence::Index,
             _ => OperatorPrecedence::Lowest,
         }
     }
@@ -168,6 +172,7 @@ impl Parser {
             TokenType::Lparen => self.parse_grouped_expression()?,
             TokenType::If => self.parse_if_expression()?,
             TokenType::Function => self.parse_function_literal()?,
+            TokenType::Lbracket => Box::new(self.parse_array_literal()?),
             _ => return Err(ParserError(format!("{} is not a valid operator", self.cur_token.r#type)))
         };
         while !self.next_token_is(&TokenType::Semicolon) && precedence < self.next_precedence() {
@@ -189,6 +194,10 @@ impl Parser {
                 TokenType::Lparen => {
                     self.next_token();
                     self.parse_call_expression(left_expr)?
+                },
+                TokenType::Lbracket => {
+                    self.next_token();
+                    self.parse_index_expression(left_expr)?
                 },
                 _ => left_expr,
             };
@@ -218,6 +227,34 @@ impl Parser {
         } else {
             Err(ParserError("Failed to parse string".to_string()))
         }
+    }
+
+    fn parse_array_literal(&mut self) -> ParserResult<ArrayLiteral> {
+        Ok(ArrayLiteral::new(self.parse_expression_list(TokenType::Rbracket)?))
+    }
+
+    fn parse_expression_list(&mut self, end: TokenType) -> ParserResult<Vec<Expr>> {
+        let mut results = vec![];
+
+        if self.next_token_is(&end) {
+            self.next_token();
+            return Ok(results)
+        }
+
+        self.next_token();
+        results.push(self.parse_expression(OperatorPrecedence::Lowest)?);
+
+        loop {
+            if !self.next_token_is(&TokenType::Comma) {
+                break
+            }
+            self.next_token();
+            self.next_token();
+            results.push(self.parse_expression(OperatorPrecedence::Lowest)?);
+        }
+
+        self.expect_next(end)?;
+        Ok(results)
     }
 
     fn parse_grouped_expression(&mut self) -> ParserResult<Expr> {
@@ -325,6 +362,13 @@ impl Parser {
     fn parse_call_expression(&mut self, function: Expr) -> ParserResult<Expr> {
         let arguments = self.parse_call_arguments()?;
         Ok(Box::new(CallExpression::new(Statement::Expression(function), arguments)))
+    }
+
+    fn parse_index_expression(&mut self, left: Expr) -> ParserResult<Expr> {
+        self.next_token();
+        let index = self.parse_expression(OperatorPrecedence::Lowest)?;
+        self.expect_next(TokenType::Rbracket)?;
+        Ok(Box::new(IndexExpression::new(left, index)))
     }
 
     fn parse_call_arguments(&mut self) -> ParserResult<Vec<Expr>> {
@@ -593,6 +637,8 @@ mod tests {
             ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
             ("add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))", "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))"),
             ("add(a + b + c * d / f + g)", "add((((a + b) + ((c * d) / f)) + g))"),
+            ("a * [1, 2, 3, 4][b * c] * d", "((a * ([1, 2, 3, 4][(b * c)])) * d)"),
+            ("add(a * b[2], b[1], 2 * [1, 2][1])", "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))"),
         ];
 
         for (input, expected) in test_cases {
@@ -715,5 +761,49 @@ mod tests {
         ] };
 
         assert_eq!(program, expectation);
+    }
+
+    #[test]
+    fn test_parse_array_literal() {
+        let test_case = "[1, 2 * 2, 3 + 3]";
+        let l = Lexer::new(test_case);
+        let mut p = Parser::new(l);
+        let program = p.parse();
+
+        assert!(p.errors.is_empty());
+        assert_eq!(program.statements.len(), 1);
+
+        let first: Expr = Box::new(Integer::new(1));
+        let infix_left_item: Expr = Box::new(Integer::new(2));
+        let infix_right_item: Expr = Box::new(Integer::new(2));
+        let second: Expr = Box::new(InfixExpr::new(
+            TokenType::Asterisk,
+            &infix_left_item,
+            &infix_right_item,
+        ));
+        let arr = ArrayLiteral::new(vec![first, second]);
+        let expectation = Program { statements: vec![
+            Statement::Expression(Box::new(arr))
+        ]};
+
+        assert_eq!(program, expectation);
+
+        let test_case = "[1, ";
+        let l = Lexer::new(test_case);
+        let mut p = Parser::new(l);
+        let _ = p.parse();
+
+        assert!(!p.errors.is_empty());
+    }
+
+    #[test]
+    fn test_parse_index_expression() {
+        let test_case = "myArray[1 + 1]";
+        let l = Lexer::new(test_case);
+        let mut p = Parser::new(l);
+        let program = p.parse();
+
+        assert!(p.errors.is_empty());
+        assert_eq!(program.statements.len(), 1);
     }
 }
