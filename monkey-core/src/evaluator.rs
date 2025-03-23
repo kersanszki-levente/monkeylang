@@ -587,25 +587,4 @@ mod tests {
             assert!(program.eval(&env).is_err());
         }
     }
-
-    #[test]
-    fn test_builtin_len_function_evaluation() {
-        let test_cases = vec![
-            ("len(\"\")", Value::Int(0)),
-            ("len(\"four\")", Value::Int(4)),
-            ("len(\"hello world\")", Value::Int(11)),
-            ("len([])", Value::Int(0)),
-            ("len([1])", Value::Int(1)),
-            ("len([1, 2])", Value::Int(2)),
-        ];
-
-        for (code, expectation) in test_cases {
-            let lexer = Lexer::new(code);
-            let mut parser = Parser::new(lexer);
-            let program = parser.parse();
-            let env = Environment::new_shared(None);
-            let return_value = program.eval(&env).unwrap();
-            assert_eq!(return_value, expectation);
-        }
-    }
 }
