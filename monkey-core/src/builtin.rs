@@ -40,11 +40,27 @@ fn last(args: &[Value]) -> EvaluationResult {
     }
 }
 
+fn rest(args: &[Value]) -> EvaluationResult {
+    if args.len() != 1 {
+        return Err(EvaluationError(format!("Expected 1 arguments, got {}", args.len())))
+    }
+    let arg = args.first().unwrap();
+    if let Value::Array(elements) = arg {
+        if elements.is_empty() {
+            return Ok(Value::Array(vec![]))
+        }
+        Ok(Value::Array(elements.clone().split_off(1)))
+    } else {
+        Err(EvaluationError("Argument to last is not supported".to_string()))
+    }
+}
+
 pub(crate) fn get(name: &str) -> Result<BuiltinFunction, EvaluationError> {
     let func = match name {
         "len" => len,
         "first" => first,
         "last" => last,
+        "rest" => rest,
         _ => return Err(EvaluationError(format!("{name} is not a known function")))
     };
     Ok(func)
@@ -102,6 +118,19 @@ mod tests {
             ("last([])", Value::Null),
             ("last([1])", Value::Expression(Box::new(crate::ast::Integer::new(1)))),
             ("last([1, 2])", Value::Expression(Box::new(crate::ast::Integer::new(2)))),
+        ];
+        for (source, expectation) in test_cases {
+            let return_value = evaluate_code(source);
+            assert_eq!(return_value, expectation);
+        }
+    }
+
+    #[test]
+    fn test_rest_function_evaluation() {
+        let test_cases = vec![
+            ("rest([])", Value::Array(Vec::new())),
+            ("rest([1])", Value::Array(Vec::new())),
+            ("rest([1, 2])", Value::Array(vec![Box::new(crate::ast::Integer::new(2))])),
         ];
         for (source, expectation) in test_cases {
             let return_value = evaluate_code(source);
