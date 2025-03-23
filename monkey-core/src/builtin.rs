@@ -36,7 +36,7 @@ fn last(args: &[Value]) -> EvaluationResult {
     let arg = args.first().unwrap();
     match arg {
         Value::Array(elements) => Ok(elements.last().map_or_else(|| Value::Null, |e| Value::Expression(e.clone()))),
-        _ => Err(EvaluationError("Argument to first is not supported".to_string()))
+        _ => Err(EvaluationError("Argument to last is not supported".to_string()))
     }
 }
 
