@@ -1,6 +1,7 @@
 use core::result::Result;
 use core::fmt::Debug;
 use std::cell::RefCell;
+use std::fmt::Display;
 use std::rc::Rc;
 
 use crate::ast::ArrayLiteral;
@@ -25,6 +26,12 @@ use crate::environment::SharedEnvironment;
 use crate::token::TokenType;
 
 pub struct EvaluationError(pub(crate) String);
+
+impl Display for EvaluationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl Debug for EvaluationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
