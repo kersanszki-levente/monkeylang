@@ -68,25 +68,22 @@ fn execute_command(mut output: &mut StandardStream, line: &str) -> Result<(), st
     Ok(())
 }
 
-fn execute_line(mut output: &mut StandardStream, line: &str, env: &SharedEnvironment) -> Result<(), std::io::Error> {
-    let lexer = Lexer::new(line);
+fn evaluate(source: &str, env: &SharedEnvironment) -> RuntimeResult<()> {
+    let lexer = Lexer::new(source);
     let mut parser = Parser::new(lexer);
-
     let program = parser.parse();
     if let Some(err) = parser.errors.first() {
-        print_err(output, err)?;
-        return Ok(())
+        return Err(RuntimeError(format!("Parsing error: {}", err)));
     };
     match program.eval(env) {
         Ok(result) => {
             match result {
                 Value::Null => {},
-                _ => writeln!(&mut output, "{}", result)?,
+                _ => return Err(RuntimeError(format!("{}", result))),
             }
         },
-        Err(err) => print_err(output, err)?,
+        Err(err) => return Err(RuntimeError(format!("{}", err))),
     };
-
     Ok(())
 }
 
@@ -104,8 +101,8 @@ fn start() -> Result<(), std::io::Error> {
             break
         } else if line.starts_with(".") {
             execute_command(&mut output, &line)?;
-        } else {
-            execute_line(&mut output, &line, &env)?;
+        } else if let Err(err) = evaluate(&line, &env) {
+            print_err(&mut output, err)?;
         };
 
         prompt(&mut output)?;
@@ -125,26 +122,10 @@ fn read_source_file(path: String) -> RuntimeResult<String> {
     Ok(buffer)
 }
 
-fn evaluate_source_file(source_file_path: String) -> RuntimeResult<()> {
-    let buffer = read_source_file(source_file_path)?;
-    let lexer = Lexer::new(&buffer);
-    let mut parser = Parser::new(lexer);
-
-    let program = parser.parse();
-    if let Some(err) = parser.errors.first() {
-        return Err(RuntimeError(format!("Parsing error: {}", err)));
-    };
-
+fn evaluate_file(path: String) -> RuntimeResult<()> {
+    let source = read_source_file(path)?;
     let env = Environment::new_shared(None);
-    match program.eval(&env) {
-        Ok(result) => {
-            match result {
-                Value::Null => {},
-                _ => return Err(RuntimeError(format!("{}", result))),
-            }
-        },
-        Err(err) => return Err(RuntimeError(format!("{:?}", err))),
-    };
+    evaluate(&source, &env)?;
     Ok(())
 }
 
@@ -155,8 +136,8 @@ struct Arguments {
 
 fn main() {
     let args = Arguments::parse();
-    if let Some(source_file) = args.file {
-        if let Err(err) = evaluate_source_file(source_file) {
+    if let Some(source_file_path) = args.file {
+        if let Err(err) = evaluate_file(source_file_path) {
             eprintln!("{err}");
         };
         std::process::exit(0);
