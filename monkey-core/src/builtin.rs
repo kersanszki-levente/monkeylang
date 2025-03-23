@@ -29,10 +29,22 @@ fn first(args: &[Value]) -> EvaluationResult {
     }
 }
 
+fn last(args: &[Value]) -> EvaluationResult {
+    if args.len() != 1 {
+        return Err(EvaluationError(format!("Expected 1 arguments, got {}", args.len())))
+    }
+    let arg = args.first().unwrap();
+    match arg {
+        Value::Array(elements) => Ok(elements.last().map_or_else(|| Value::Null, |e| Value::Expression(e.clone()))),
+        _ => Err(EvaluationError("Argument to first is not supported".to_string()))
+    }
+}
+
 pub(crate) fn get(name: &str) -> Result<BuiltinFunction, EvaluationError> {
     let func = match name {
         "len" => len,
         "first" => first,
+        "last" => last,
         _ => return Err(EvaluationError(format!("{name} is not a known function")))
     };
     Ok(func)
@@ -77,6 +89,19 @@ mod tests {
             ("first([])", Value::Null),
             ("first([1])", Value::Expression(Box::new(crate::ast::Integer::new(1)))),
             ("first([1, 2])", Value::Expression(Box::new(crate::ast::Integer::new(1)))),
+        ];
+        for (source, expectation) in test_cases {
+            let return_value = evaluate_code(source);
+            assert_eq!(return_value, expectation);
+        }
+    }
+
+    #[test]
+    fn test_last_function_evaluation() {
+        let test_cases = vec![
+            ("last([])", Value::Null),
+            ("last([1])", Value::Expression(Box::new(crate::ast::Integer::new(1)))),
+            ("last([1, 2])", Value::Expression(Box::new(crate::ast::Integer::new(2)))),
         ];
         for (source, expectation) in test_cases {
             let return_value = evaluate_code(source);
