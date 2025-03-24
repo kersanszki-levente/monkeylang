@@ -68,23 +68,14 @@ fn execute_command(mut output: &mut StandardStream, line: &str) -> Result<(), st
     Ok(())
 }
 
-fn evaluate(source: &str, env: &SharedEnvironment) -> RuntimeResult<()> {
+fn evaluate(source: &str, env: &SharedEnvironment) -> RuntimeResult<Value> {
     let lexer = Lexer::new(source);
     let mut parser = Parser::new(lexer);
     let program = parser.parse();
     if let Some(err) = parser.errors.first() {
         return Err(RuntimeError(format!("Parsing error: {}", err)));
     };
-    match program.eval(env) {
-        Ok(result) => {
-            match result {
-                Value::Null => {},
-                _ => return Err(RuntimeError(format!("{}", result))),
-            }
-        },
-        Err(err) => return Err(RuntimeError(format!("{}", err))),
-    };
-    Ok(())
+    program.eval(env).map_err(|err| RuntimeError(format!("{err}")))
 }
 
 fn start() -> Result<(), std::io::Error> {
@@ -101,8 +92,11 @@ fn start() -> Result<(), std::io::Error> {
             break
         } else if line.starts_with(".") {
             execute_command(&mut output, &line)?;
-        } else if let Err(err) = evaluate(&line, &env) {
-            print_err(&mut output, err)?;
+        } else {
+            match evaluate(&line, &env) {
+                Ok(result) => writeln!(&mut output, "{}", result)?,
+                Err(err) => print_err(&mut output, err)?,
+            }
         };
 
         prompt(&mut output)?;
@@ -125,7 +119,8 @@ fn read_source_file(path: String) -> RuntimeResult<String> {
 fn evaluate_file(path: String) -> RuntimeResult<()> {
     let source = read_source_file(path)?;
     let env = Environment::new_shared(None);
-    evaluate(&source, &env)?;
+    let result = evaluate(&source, &env)?;
+    println!("{result}");
     Ok(())
 }
 
