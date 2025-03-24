@@ -1,8 +1,6 @@
 use std::result::Result;
 
-use crate::ast::Expr;
 use crate::ast::Value;
-use crate::ast::ValueIdentity;
 use crate::evaluator::EvaluationError;
 use crate::evaluator::EvaluationResult;
 
@@ -34,7 +32,7 @@ fn first(args: &[Value]) -> EvaluationResult {
     }
     let arg = args.first().unwrap();
     match arg {
-        Value::Array(elements) => Ok(elements.first().map_or_else(|| Value::Null, |e| Value::Expression(e.clone()))),
+        Value::Array(elements) => Ok(elements.first().unwrap_or(&Value::Null).clone()),
         _ => Err(EvaluationError("Argument to first is not supported".to_string()))
     }
 }
@@ -45,7 +43,7 @@ fn last(args: &[Value]) -> EvaluationResult {
     }
     let arg = args.first().unwrap();
     match arg {
-        Value::Array(elements) => Ok(elements.last().map_or_else(|| Value::Null, |e| Value::Expression(e.clone()))),
+        Value::Array(elements) => Ok(elements.last().unwrap_or(&Value::Null).clone()),
         _ => Err(EvaluationError("Argument to last is not supported".to_string()))
     }
 }
@@ -68,7 +66,7 @@ fn rest(args: &[Value]) -> EvaluationResult {
 fn push(args: &[Value]) -> EvaluationResult {
     assert_argument_length(args, 2)?;
     let arr = args.first().unwrap();
-    let new: Expr = Box::new(ValueIdentity::new(args.get(1).unwrap().clone()));
+    let new = args.get(1).unwrap().clone();
     if let Value::Array(elements) = arr {
         let mut elements = elements.clone();
         elements.push(new);
@@ -130,8 +128,8 @@ mod tests {
     fn test_first_function_evaluation() {
         let test_cases = vec![
             ("first([])", Value::Null),
-            ("first([1])", Value::Expression(Box::new(crate::ast::Integer::new(1)))),
-            ("first([1, 2])", Value::Expression(Box::new(crate::ast::Integer::new(1)))),
+            ("first([1])", Value::Int(1)),
+            ("first([1, 2])", Value::Int(1)),
         ];
         for (source, expectation) in test_cases {
             let return_value = evaluate_code(source);
@@ -143,8 +141,8 @@ mod tests {
     fn test_last_function_evaluation() {
         let test_cases = vec![
             ("last([])", Value::Null),
-            ("last([1])", Value::Expression(Box::new(crate::ast::Integer::new(1)))),
-            ("last([1, 2])", Value::Expression(Box::new(crate::ast::Integer::new(2)))),
+            ("last([1])", Value::Int(1)),
+            ("last([1, 2])", Value::Int(2)),
         ];
         for (source, expectation) in test_cases {
             let return_value = evaluate_code(source);
@@ -157,7 +155,7 @@ mod tests {
         let test_cases = vec![
             ("rest([])", Value::Array(Vec::new())),
             ("rest([1])", Value::Array(Vec::new())),
-            ("rest([1, 2])", Value::Array(vec![Box::new(crate::ast::Integer::new(2))])),
+            ("rest([1, 2])", Value::Array(vec![Value::Int(2)])),
         ];
         for (source, expectation) in test_cases {
             let return_value = evaluate_code(source);
@@ -168,8 +166,8 @@ mod tests {
     #[test]
     fn test_push_function_evaluation() {
         let test_cases = vec![
-            ("push([], 1);", Value::Array(vec![Box::new(crate::ast::ValueIdentity::new(Value::Int(1)))])),
-            ("let arr = []; push(arr, 1);", Value::Array(vec![Box::new(crate::ast::ValueIdentity::new(Value::Int(1)))])),
+            ("push([], 1);", Value::Array(vec![Value::Int(1)])),
+            ("let arr = []; push(arr, 1);", Value::Array(vec![Value::Int(1)])),
         ];
         for (source, expectation) in test_cases {
             let return_value = evaluate_code(source);

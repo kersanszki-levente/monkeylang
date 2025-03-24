@@ -774,14 +774,21 @@ mod tests {
         assert_eq!(program.statements.len(), 1);
 
         let first: Expr = Box::new(Integer::new(1));
-        let infix_left_item: Expr = Box::new(Integer::new(2));
-        let infix_right_item: Expr = Box::new(Integer::new(2));
+        let first_infix_left_item: Expr = Box::new(Integer::new(2));
+        let first_infix_right_item: Expr = Box::new(Integer::new(2));
         let second: Expr = Box::new(InfixExpr::new(
             TokenType::Asterisk,
-            &infix_left_item,
-            &infix_right_item,
+            &first_infix_left_item,
+            &first_infix_right_item,
         ));
-        let arr = ArrayLiteral::new(vec![first, second]);
+        let second_infix_left_item: Expr = Box::new(Integer::new(3));
+        let second_infix_right_item: Expr = Box::new(Integer::new(3));
+        let third: Expr = Box::new(InfixExpr::new(
+            TokenType::Plus,
+            &second_infix_left_item,
+            &second_infix_right_item,
+        ));
+        let arr = ArrayLiteral::new(vec![first, second, third]);
         let expectation = Program { statements: vec![
             Statement::Expression(Box::new(arr))
         ]};

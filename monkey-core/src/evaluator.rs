@@ -7,6 +7,7 @@ use std::rc::Rc;
 use crate::ast::ArrayLiteral;
 use crate::ast::Boolean;
 use crate::ast::CallExpression;
+use crate::ast::Expr;
 use crate::ast::Expression;
 use crate::ast::FunctionLiteral;
 use crate::ast::Identifier;
@@ -19,7 +20,6 @@ use crate::ast::Program;
 use crate::ast::Statement;
 use crate::ast::StringLiteral;
 use crate::ast::Value;
-use crate::ast::ValueIdentity;
 use crate::builtin;
 use crate::environment::Environment;
 use crate::environment::SharedEnvironment;
@@ -109,12 +109,6 @@ impl Evaluate for Value {
     }
 }
 
-impl Evaluate for ValueIdentity {
-    fn eval(&self, _: &SharedEnvironment) -> EvaluationResult {
-        Ok(self.value.clone())
-    }
-}
-
 impl Evaluate for Integer {
     fn eval(&self, _: &SharedEnvironment) -> EvaluationResult {
         Ok(self.value())
@@ -134,8 +128,13 @@ impl Evaluate for Boolean {
 }
 
 impl Evaluate for ArrayLiteral {
-    fn eval(&self, _: &SharedEnvironment) -> EvaluationResult {
-        Ok(Value::Array(self.elements.clone()))
+    fn eval(&self, env: &SharedEnvironment) -> EvaluationResult {
+        let new_array = self
+            .elements
+            .iter()
+            .map(|e: &Expr| -> EvaluationResult { e.eval(env) })
+            .collect::<Result<Vec<Value>, EvaluationError>>()?;
+        Ok(Value::Array(new_array))
     }
 }
 
