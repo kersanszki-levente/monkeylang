@@ -5,7 +5,7 @@ const FIBONACCI: &str = "tests/input/fibonacci.mo";
 fn run(example_name: &str, expected_file: &str) -> TestResult {
     let expected = std::fs::read_to_string(expected_file)?;
     let output = assert_cmd::Command::cargo_bin("repl")?
-        .args(vec!["-c", example_name])
+        .args(vec![example_name])
         .output()
         .expect("Failed to execute test");
     assert!(output.status.success());
