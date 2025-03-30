@@ -7,3 +7,6 @@ edition = "2021"
 clap = { version = "4.5.32", features = ["derive"] }
 monkey-core = { path = "../monkey-core/" }
 termcolor = { version = "1.4.*" }
+
+[dev-dependencies]
+assert_cmd = "2.0.16"
