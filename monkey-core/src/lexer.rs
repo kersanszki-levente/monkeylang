@@ -67,72 +67,81 @@ impl Lexer {
         self.skip_whitespace();
 
         let next = match self.ch {
-            None => Token{ r#type: TokenType::EOF, literal: None },
+            None => Token::new(TokenType::EOF, None, self.position),
             Some(next_char) => match next_char {
                 '=' => {
                     if self.peek_char() == Some('=') {
                         self.read_char();
-                        Token{ r#type: TokenType::Eq, literal: None }
+                        Token::new(TokenType::Eq, None, self.position)
                     } else {
-                        Token{ r#type: TokenType::Assign, literal: None }
+                        Token::new(TokenType::Assign, None, self.position)
                     }
                 },
-                '+' => Token{ r#type: TokenType::Plus, literal: None },
-                '-' => Token{ r#type: TokenType::Minus, literal: None },
+                '+' => Token::new(TokenType::Plus, None, self.position),
+                '-' => Token::new(TokenType::Minus, None, self.position),
                 '!' => {
                     if self.peek_char() == Some('=') {
+                        let position = self.position;
                         self.read_char();
-                        Token{ r#type: TokenType::NotEq, literal: None }
+                        Token::new(TokenType::NotEq, None, position)
                     } else {
-                        Token{ r#type: TokenType::Bang, literal: None }
+                        Token::new(TokenType::Bang, None, self.position)
                     }
                 },
-                '/' => Token{ r#type: TokenType::Slash, literal: None },
-                '*' => Token{ r#type: TokenType::Asterisk, literal: None },
+                '/' => Token::new(TokenType::Slash, None, self.position),
+                '*' => Token::new(TokenType::Asterisk, None, self.position),
                 '<' => {
                     if self.peek_char() == Some('=') {
+                        let position = self.position;
                         self.read_char();
-                        Token{ r#type: TokenType::LtE, literal: None }
+                        Token::new(TokenType::LtE, None, position)
                     } else {
-                        Token{ r#type: TokenType::Lt, literal: None }
+                        Token::new(TokenType::Lt, None, self.position)
                     }
                 },
                 '>' => {
                     if self.peek_char() == Some('=') {
+                        let position = self.position;
                         self.read_char();
-                        Token{ r#type: TokenType::GtE, literal: None }
+                        Token::new(TokenType::GtE, None, position)
                     } else {
-                        Token{ r#type: TokenType::Gt, literal: None }
+                        Token::new(TokenType::Gt, None, self.position)
                     }
                 },
-                ';' => Token{ r#type: TokenType::Semicolon, literal: None },
-                '(' => Token{ r#type: TokenType::Lparen, literal: None },
-                ')' => Token{ r#type: TokenType::Rparen, literal: None },
-                ',' => Token{ r#type: TokenType::Comma, literal: None },
-                '{' => Token{ r#type: TokenType::Lbrace, literal: None },
-                '}' => Token{ r#type: TokenType::Rbrace, literal: None },
-                '[' => Token{ r#type: TokenType::Lbracket, literal: None },
-                ']' => Token{ r#type: TokenType::Rbracket, literal: None },
-                '"' => Token{ r#type: TokenType::String, literal: self.read_string() },
+                ';' => Token::new(TokenType::Semicolon, None, self.position),
+                '(' => Token::new(TokenType::Lparen, None, self.position),
+                ')' => Token::new(TokenType::Rparen, None, self.position),
+                ',' => Token::new(TokenType::Comma, None, self.position),
+                '{' => Token::new(TokenType::Lbrace, None, self.position),
+                '}' => Token::new(TokenType::Rbrace, None, self.position),
+                '[' => Token::new(TokenType::Lbracket, None, self.position),
+                ']' => Token::new(TokenType::Rbracket, None, self.position),
+                '"' => {
+                    let position = self.position;
+                    Token::new(TokenType::String, self.read_string(), position)
+                },
                 _ => {
                     if next_char.is_alphabetic() {
+                        let position = self.position;
                         let literal = self.read_identifier();
                         let token = match literal {
-                            Some("let") => Token{ r#type: TokenType::Let, literal: None },
-                            Some("fn") => Token{ r#type: TokenType::Function, literal: None },
-                            Some("true") => Token{ r#type: TokenType::True, literal: None },
-                            Some("false") => Token{ r#type: TokenType::False, literal: None },
-                            Some("if") => Token{ r#type: TokenType::If, literal: None },
-                            Some("else") => Token{ r#type: TokenType::Else, literal: None },
-                            Some("return") => Token{ r#type: TokenType::Return, literal: None },
-                            Some(_) => Token{ r#type: TokenType::Ident, literal: literal.map(|s| s.to_owned()) },
+                            Some("let") => Token::new(TokenType::Let, None, position),
+                            Some("fn") => Token::new(TokenType::Function, None, position),
+                            Some("true") => Token::new(TokenType::True, None, position),
+                            Some("false") => Token::new(TokenType::False, None, position),
+                            Some("if") => Token::new(TokenType::If, None, position),
+                            Some("else") => Token::new(TokenType::Else, None, position),
+                            Some("return") => Token::new(TokenType::Return, None, position),
+                            Some(_) => Token::new(TokenType::Ident, literal.map(|s| s.to_owned()), position),
                             _ => unimplemented!(),
                         };
                         return token
                     } else if next_char.is_numeric() {
-                        return Token{ r#type: TokenType::Int, literal: self.read_number().map(|s| s.to_owned()) }
+                        let position = self.position;
+                        return Token::new(TokenType::Int, self.read_number().map(|s| s.to_owned()), position)
                     } else {
-                        Token{ r#type: TokenType::Illegal, literal: Some(next_char.to_string()) }
+                        let position = self.position;
+                        Token::new(TokenType::Illegal, Some(next_char.to_string()), position)
                     }
                 },
             }
@@ -159,11 +168,6 @@ mod tests {
 
     #[test]
     fn test_next_token() {
-        struct TestCase {
-            expected_type: TokenType,
-            expected_literal: Option<String>,
-        }
-
         let input = r#"let five = 5;
                        let ten = 10;
 
@@ -190,106 +194,105 @@ mod tests {
                        10 >= 9;
                        [1, 2];
         "#;
-        let test_cases: Vec<TestCase> = vec![
-            TestCase { expected_type: TokenType::Let, expected_literal: None },
-            TestCase { expected_type: TokenType::Ident, expected_literal: Some("five".to_string()) },
-            TestCase { expected_type: TokenType::Assign, expected_literal: None },
-            TestCase { expected_type: TokenType::Int, expected_literal: Some("5".to_string()) },
-            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
-            TestCase { expected_type: TokenType::Let, expected_literal: None },
-            TestCase { expected_type: TokenType::Ident, expected_literal: Some("ten".to_string()) },
-            TestCase { expected_type: TokenType::Assign, expected_literal: None },
-            TestCase { expected_type: TokenType::Int, expected_literal: Some("10".to_string()) },
-            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
-            TestCase { expected_type: TokenType::Let, expected_literal: None },
-            TestCase { expected_type: TokenType::Ident, expected_literal: Some("add".to_string()) },
-            TestCase { expected_type: TokenType::Assign, expected_literal: None },
-            TestCase { expected_type: TokenType::Function, expected_literal: None },
-            TestCase { expected_type: TokenType::Lparen, expected_literal: None },
-            TestCase { expected_type: TokenType::Ident, expected_literal: Some("x".to_string()) },
-            TestCase { expected_type: TokenType::Comma, expected_literal: None },
-            TestCase { expected_type: TokenType::Ident, expected_literal: Some("y".to_string()) },
-            TestCase { expected_type: TokenType::Rparen, expected_literal: None },
-            TestCase { expected_type: TokenType::Lbrace, expected_literal: None },
-            TestCase { expected_type: TokenType::Ident, expected_literal: Some("x".to_string()) },
-            TestCase { expected_type: TokenType::Plus, expected_literal: None },
-            TestCase { expected_type: TokenType::Ident, expected_literal: Some("y".to_string()) },
-            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
-            TestCase { expected_type: TokenType::Rbrace, expected_literal: None },
-            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
-            TestCase { expected_type: TokenType::Let, expected_literal: None },
-            TestCase { expected_type: TokenType::Ident, expected_literal: Some("result".to_string()) },
-            TestCase { expected_type: TokenType::Assign, expected_literal: None },
-            TestCase { expected_type: TokenType::Ident, expected_literal: Some("add".to_string()) },
-            TestCase { expected_type: TokenType::Lparen, expected_literal: None },
-            TestCase { expected_type: TokenType::Ident, expected_literal: Some("five".to_string()) },
-            TestCase { expected_type: TokenType::Comma, expected_literal: None },
-            TestCase { expected_type: TokenType::Ident, expected_literal: Some("ten".to_string()) },
-            TestCase { expected_type: TokenType::Rparen, expected_literal: None },
-            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
-            TestCase { expected_type: TokenType::Bang, expected_literal: None },
-            TestCase { expected_type: TokenType::Minus, expected_literal: None },
-            TestCase { expected_type: TokenType::Slash, expected_literal: None },
-            TestCase { expected_type: TokenType::Asterisk, expected_literal: None },
-            TestCase { expected_type: TokenType::Int, expected_literal: Some("5".to_string()) },
-            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
-            TestCase { expected_type: TokenType::Int, expected_literal: Some("5".to_string()) },
-            TestCase { expected_type: TokenType::Lt, expected_literal: None },
-            TestCase { expected_type: TokenType::Int, expected_literal: Some("10".to_string()) },
-            TestCase { expected_type: TokenType::Gt, expected_literal: None },
-            TestCase { expected_type: TokenType::Int, expected_literal: Some("5".to_string()) },
-            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
-            TestCase { expected_type: TokenType::If, expected_literal: None },
-            TestCase { expected_type: TokenType::Lparen, expected_literal: None },
-            TestCase { expected_type: TokenType::Int, expected_literal: Some("5".to_string()) },
-            TestCase { expected_type: TokenType::Lt, expected_literal: None },
-            TestCase { expected_type: TokenType::Int, expected_literal: Some("10".to_string()) },
-            TestCase { expected_type: TokenType::Rparen, expected_literal: None },
-            TestCase { expected_type: TokenType::Lbrace, expected_literal: None },
-            TestCase { expected_type: TokenType::Return, expected_literal: None },
-            TestCase { expected_type: TokenType::True, expected_literal: None },
-            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
-            TestCase { expected_type: TokenType::Rbrace, expected_literal: None },
-            TestCase { expected_type: TokenType::Else, expected_literal: None },
-            TestCase { expected_type: TokenType::Lbrace, expected_literal: None },
-            TestCase { expected_type: TokenType::Return, expected_literal: None },
-            TestCase { expected_type: TokenType::False, expected_literal: None },
-            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
-            TestCase { expected_type: TokenType::Rbrace, expected_literal: None },
-            TestCase { expected_type: TokenType::Int, expected_literal: Some("10".to_string()) },
-            TestCase { expected_type: TokenType::Eq, expected_literal: None },
-            TestCase { expected_type: TokenType::Int, expected_literal: Some("10".to_string()) },
-            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
-            TestCase { expected_type: TokenType::Int, expected_literal: Some("10".to_string()) },
-            TestCase { expected_type: TokenType::NotEq, expected_literal: None },
-            TestCase { expected_type: TokenType::Int, expected_literal: Some("9".to_string()) },
-            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
-            TestCase { expected_type: TokenType::String, expected_literal: Some("foobar".to_string()) },
-            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
-            TestCase { expected_type: TokenType::String, expected_literal: Some("foo bar".to_string()) },
-            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
-            TestCase { expected_type: TokenType::Int, expected_literal: Some("10".to_string()) },
-            TestCase { expected_type: TokenType::LtE, expected_literal: None },
-            TestCase { expected_type: TokenType::Int, expected_literal: Some("9".to_string()) },
-            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
-            TestCase { expected_type: TokenType::Int, expected_literal: Some("10".to_string()) },
-            TestCase { expected_type: TokenType::GtE, expected_literal: None },
-            TestCase { expected_type: TokenType::Int, expected_literal: Some("9".to_string()) },
-            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
-            TestCase { expected_type: TokenType::Lbracket, expected_literal: None },
-            TestCase { expected_type: TokenType::Int, expected_literal: Some("1".to_string()) },
-            TestCase { expected_type: TokenType::Comma, expected_literal: None },
-            TestCase { expected_type: TokenType::Int, expected_literal: Some("2".to_string()) },
-            TestCase { expected_type: TokenType::Rbracket, expected_literal: None },
-            TestCase { expected_type: TokenType::Semicolon, expected_literal: None },
-            TestCase { expected_type: TokenType::EOF, expected_literal: None },
+        let tokens : Vec<Token> = vec![
+            Token::new(TokenType::Let, None, 0),
+            Token::new(TokenType::Ident, Some("five".to_string()), 4),
+            Token::new(TokenType::Assign, None, 9),
+            Token::new(TokenType::Int, Some("5".to_string()), 11),
+            Token::new(TokenType::Semicolon, None, 12),
+            Token::new(TokenType::Let, None, 37),
+            Token::new(TokenType::Ident, Some("ten".to_string()), 41),
+            Token::new(TokenType::Assign, None, 45),
+            Token::new(TokenType::Int, Some("10".to_string()), 47),
+            Token::new(TokenType::Semicolon, None, 49),
+            Token::new(TokenType::Let, None, 75),
+            Token::new(TokenType::Ident, Some("add".to_string()), 79),
+            Token::new(TokenType::Assign, None, 83),
+            Token::new(TokenType::Function, None, 85),
+            Token::new(TokenType::Lparen, None, 87),
+            Token::new(TokenType::Ident, Some("x".to_string()), 88),
+            Token::new(TokenType::Comma, None, 89),
+            Token::new(TokenType::Ident, Some("y".to_string()), 91),
+            Token::new(TokenType::Rparen, None, 92),
+            Token::new(TokenType::Lbrace, None, 94),
+            Token::new(TokenType::Ident, Some("x".to_string()), 121),
+            Token::new(TokenType::Plus, None, 123),
+            Token::new(TokenType::Ident, Some("y".to_string()), 125),
+            Token::new(TokenType::Semicolon, None, 126),
+            Token::new(TokenType::Rbrace, None, 151),
+            Token::new(TokenType::Semicolon, None, 152),
+            Token::new(TokenType::Let, None, 178),
+            Token::new(TokenType::Ident, Some("result".to_string()), 182),
+            Token::new(TokenType::Assign, None, 189),
+            Token::new(TokenType::Ident, Some("add".to_string()), 191),
+            Token::new(TokenType::Lparen, None, 194),
+            Token::new(TokenType::Ident, Some("five".to_string()), 195),
+            Token::new(TokenType::Comma, None, 199),
+            Token::new(TokenType::Ident, Some("ten".to_string()), 201),
+            Token::new(TokenType::Rparen, None, 204),
+            Token::new(TokenType::Semicolon, None, 205),
+            Token::new(TokenType::Bang, None, 230),
+            Token::new(TokenType::Minus, None, 231),
+            Token::new(TokenType::Slash, None, 232),
+            Token::new(TokenType::Asterisk, None, 233),
+            Token::new(TokenType::Int, Some("5".to_string()), 234),
+            Token::new(TokenType::Semicolon, None, 235),
+            Token::new(TokenType::Int, Some("5".to_string()), 260),
+            Token::new(TokenType::Lt, None, 262),
+            Token::new(TokenType::Int, Some("10".to_string()), 264),
+            Token::new(TokenType::Gt, None, 267),
+            Token::new(TokenType::Int, Some("5".to_string()), 269),
+            Token::new(TokenType::Semicolon, None, 270),
+            Token::new(TokenType::If, None, 296),
+            Token::new(TokenType::Lparen, None, 299),
+            Token::new(TokenType::Int, Some("5".to_string()), 300),
+            Token::new(TokenType::Lt, None, 302),
+            Token::new(TokenType::Int, Some("10".to_string()), 304),
+            Token::new(TokenType::Rparen, None, 306),
+            Token::new(TokenType::Lbrace, None, 308),
+            Token::new(TokenType::Return, None, 335),
+            Token::new(TokenType::True, None, 342),
+            Token::new(TokenType::Semicolon, None, 346),
+            Token::new(TokenType::Rbrace, None, 371),
+            Token::new(TokenType::Else, None, 373),
+            Token::new(TokenType::Lbrace, None, 378),
+            Token::new(TokenType::Return, None, 405),
+            Token::new(TokenType::False, None, 412),
+            Token::new(TokenType::Semicolon, None, 417),
+            Token::new(TokenType::Rbrace, None, 442),
+            Token::new(TokenType::Int, Some("10".to_string()), 468),
+            Token::new(TokenType::Eq, None, 472),
+            Token::new(TokenType::Int, Some("10".to_string()), 474),
+            Token::new(TokenType::Semicolon, None, 476),
+            Token::new(TokenType::Int, Some("10".to_string()), 501),
+            Token::new(TokenType::NotEq, None, 504),
+            Token::new(TokenType::Int, Some("9".to_string()), 507),
+            Token::new(TokenType::Semicolon, None, 508),
+            Token::new(TokenType::String, Some("foobar".to_string()), 533),
+            Token::new(TokenType::Semicolon, None, 541),
+            Token::new(TokenType::String, Some("foo bar".to_string()), 566),
+            Token::new(TokenType::Semicolon, None, 575),
+            Token::new(TokenType::Int, Some("10".to_string()), 601),
+            Token::new(TokenType::LtE, None, 604),
+            Token::new(TokenType::Int, Some("9".to_string()), 607),
+            Token::new(TokenType::Semicolon, None, 608),
+            Token::new(TokenType::Int, Some("10".to_string()), 633),
+            Token::new(TokenType::GtE, None, 636),
+            Token::new(TokenType::Int, Some("9".to_string()), 639),
+            Token::new(TokenType::Semicolon, None, 640),
+            Token::new(TokenType::Lbracket, None, 665),
+            Token::new(TokenType::Int, Some("1".to_string()), 666),
+            Token::new(TokenType::Comma, None, 667),
+            Token::new(TokenType::Int, Some("2".to_string()), 669),
+            Token::new(TokenType::Rbracket, None, 670),
+            Token::new(TokenType::Semicolon, None, 671),
+            Token::new(TokenType::EOF, None, 681),
         ];
 
-        let mut exer = Lexer::new(input);
-        for case in test_cases {
-            let token = exer.next_token();
-            assert_eq!(token.r#type, case.expected_type);
-            assert_eq!(token.literal, case.expected_literal);
+        let mut lexer = Lexer::new(input);
+        for expected_token in tokens{
+            let token = lexer.next_token();
+            assert_eq!(token, expected_token);
         }
     }
 }
