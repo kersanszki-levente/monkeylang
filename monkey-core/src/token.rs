@@ -87,12 +87,13 @@ impl Display for TokenType {
 pub struct Token {
     pub(crate) r#type: TokenType,
     pub(crate) literal: Option<String>,
-    pub(crate) start_position: usize,
+    pub(crate) row_position: usize,
+    pub(crate) col_position: usize,
 }
 
 impl Token {
-    pub fn new(r#type: TokenType, literal: Option<String>, start_position: usize) -> Token {
-        Token { r#type, literal, start_position }
+    pub fn new(r#type: TokenType, literal: Option<String>, row_position: usize, col_position: usize) -> Token {
+        Token { r#type, literal, row_position, col_position }
     }
     pub fn is_type(&self, expected: TokenType) -> bool {
         self.r#type == expected
