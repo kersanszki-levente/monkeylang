@@ -343,13 +343,17 @@ fn unwrap_return_value(value: &Value) -> EvaluationResult {
 mod tests {
     use super::*;
 
-    use crate::{ast::Expr, lexer::Lexer, parser::Parser};
+    use crate::ast::Expr;
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+    use crate::token::Token;
 
     #[test]
     fn test_program_evaluation() {
-        let left_int: Expr = Box::new(Integer::new(3));
-        let right_int: Expr = Box::new(Integer::new(7));
-        let one = Box::new(InfixExpr::new(TokenType::Plus, &left_int, &right_int));
+        let arbitrary_token = Token::new(TokenType::Int, Some("literal".to_string()), 1, 1);
+        let left_int: Expr = Box::new(Integer::new(3, arbitrary_token.clone()));
+        let right_int: Expr = Box::new(Integer::new(7, arbitrary_token.clone()));
+        let one = Box::new(InfixExpr::new(TokenType::Plus, &left_int, &right_int, arbitrary_token.clone()));
         let statement = Statement::Expression(one);
         let mut program = Program::new();
         program.statements.push(statement);
@@ -362,9 +366,10 @@ mod tests {
 
     #[test]
     fn test_expression_statement_evaluation() {
-        let left_int: Expr = Box::new(Integer::new(3));
-        let right_int: Expr = Box::new(Integer::new(7));
-        let one = Box::new(InfixExpr::new(TokenType::Plus, &left_int, &right_int));
+        let arbitrary_token = Token::new(TokenType::Int, Some("literal".to_string()), 1, 1);
+        let left_int: Expr = Box::new(Integer::new(3, arbitrary_token.clone()));
+        let right_int: Expr = Box::new(Integer::new(7, arbitrary_token.clone()));
+        let one = Box::new(InfixExpr::new(TokenType::Plus, &left_int, &right_int, arbitrary_token.clone()));
         let statement = Statement::Expression(one);
 
         let expected = Value::Int(10);
@@ -503,10 +508,12 @@ mod tests {
         let env = Environment::new_shared(None);
         let program = Parser::new(lexer).parse().eval(&env).unwrap();
 
-        let offset_value: Expr = Box::new(Integer::new(2));
-        let func_var: Expr = Box::new(Identifier::new("x"));
-        let body = Statement::Expression(Box::new(InfixExpr::new(TokenType::Plus, &func_var, &offset_value)));
-        let expectation = Value::Function(Box::new(Statement::Block(vec![body])), Box::new(vec![Identifier::new("x")]), env);
+        let offset_value: Expr = Box::new(Integer::new(2, Token::new(TokenType::Int, Some("2".to_string()), 1, 13)));
+        let func_var: Expr = Box::new(Identifier::new("x", Token::new(TokenType::Ident, Some("x".to_string()), 1, 9)));
+        let body = Statement::Expression(Box::new(InfixExpr::new(TokenType::Plus, &func_var, &offset_value, Token::new(TokenType::Plus, Some("+".to_string()), 1, 11))));
+        let expectation = Value::Function(Box::new(Statement::Block(vec![body])), Box::new(vec![
+            Identifier::new("x", Token::new(TokenType::Ident, Some("x".to_string()), 1, 4))
+        ]), env);
         assert_eq!(program, expectation);
     }
 

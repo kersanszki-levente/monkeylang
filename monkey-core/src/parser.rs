@@ -126,7 +126,7 @@ impl Parser {
 
     fn parse_let_statement(&mut self) -> ParserResult<Statement> {
         self.expect_next(TokenType::Ident)?;
-        let name: Identifier = self.cur_token.literal.clone().unwrap().into();
+        let name = Identifier::new(&self.cur_token.literal.clone().unwrap(), self.cur_token.clone());
         self.expect_next(TokenType::Assign)?;
         self.next_token();
         let expr = self.parse_expression(OperatorPrecedence::Lowest)?;
@@ -164,8 +164,8 @@ impl Parser {
             TokenType::Int => Box::new(self.parse_integer_literal()?),
             TokenType::String => Box::new(self.parse_string_literal()?),
             TokenType::Minus | TokenType::Bang => self.parse_prefix_expression()?,
-            TokenType::True => Box::new(Boolean::new(true)),
-            TokenType::False => Box::new(Boolean::new(false)),
+            TokenType::True => Box::new(Boolean::new(true, self.cur_token.clone())),
+            TokenType::False => Box::new(Boolean::new(false, self.cur_token.clone())),
             TokenType::Lparen => self.parse_grouped_expression()?,
             TokenType::If => self.parse_if_expression()?,
             TokenType::Function => self.parse_function_literal()?,
@@ -213,7 +213,7 @@ impl Parser {
     }
 
     fn parse_identifier(&self) -> Identifier {
-        Identifier::new(self.cur_token.literal.as_ref().unwrap())
+        Identifier::new(self.cur_token.literal.as_ref().unwrap(), self.cur_token.clone())
     }
 
     fn parse_integer_literal(&self) -> ParserResult<Integer> {
@@ -245,12 +245,12 @@ impl Parser {
                 return Err(ParserError(error_message))
             },
         };
-        Ok(Integer::new(value))
+        Ok(Integer::new(value, self.cur_token.clone()))
     }
 
     fn parse_string_literal(&self) -> ParserResult<StringLiteral> {
         if let Some(literal) = &self.cur_token.literal {
-            Ok(StringLiteral::new(literal.to_string()))
+            Ok(StringLiteral::new(literal.to_string(), self.cur_token.clone()))
         } else {
             let cause = "Failed to parse string".to_string();
             let error_message = ErrorMessage::new(
@@ -265,7 +265,7 @@ impl Parser {
     }
 
     fn parse_array_literal(&mut self) -> ParserResult<ArrayLiteral> {
-        Ok(ArrayLiteral::new(self.parse_expression_list(TokenType::Rbracket)?))
+        Ok(ArrayLiteral::new(self.parse_expression_list(TokenType::Rbracket)?, self.cur_token.clone()))
     }
 
     fn parse_expression_list(&mut self, end: TokenType) -> ParserResult<Vec<Expr>> {
@@ -303,7 +303,7 @@ impl Parser {
         let operator = self.cur_token.r#type.clone();
         self.next_token();
         let right = self.parse_expression(OperatorPrecedence::Prefix)?;
-        Ok(Box::new(PrefixedExpr::new(operator, &right)))
+        Ok(Box::new(PrefixedExpr::new(operator, &right, self.cur_token.clone())))
     }
 
     fn parse_infix_expression(&mut self, left: Expr) -> ParserResult<Expr> {
@@ -311,7 +311,7 @@ impl Parser {
         let precedence = self.cur_precedence();
         self.next_token();
         let right = self.parse_expression(precedence)?;
-        Ok(Box::new(InfixExpr::new(operator, &left, &right)))
+        Ok(Box::new(InfixExpr::new(operator, &left, &right, self.cur_token.clone())))
     }
 
     fn parse_if_expression(&mut self) -> ParserResult<Expr> {
@@ -333,7 +333,8 @@ impl Parser {
         let expression: Expr = Box::new(IfExpr::new(
             &condition,
             consequence,
-            alternative
+            alternative,
+            self.cur_token.clone()
         ));
         Ok(expression)
     }
@@ -357,7 +358,7 @@ impl Parser {
         self.expect_next(TokenType::Lbrace)?;
         let body = self.parse_block_statement()?;
 
-        let func = FunctionLiteral::new(parameters, body);
+        let func = FunctionLiteral::new(parameters, body, self.cur_token.clone());
         Ok(Box::new(func))
     }
 
@@ -372,7 +373,7 @@ impl Parser {
         self.next_token();
 
         match &self.cur_token.literal {
-            Some(literal) => parameters.push(Identifier::new(literal)),
+            Some(literal) => parameters.push(Identifier::new(literal, self.cur_token.clone())),
             None => {
                 let cause = format!("Expected function parameter, got {:?}", self.cur_token);
                 let error_message = ErrorMessage::new(
@@ -390,7 +391,7 @@ impl Parser {
             self.next_token();
             self.next_token();
             match &self.cur_token.literal {
-                Some(literal) => parameters.push(Identifier::new(literal)),
+                Some(literal) => parameters.push(Identifier::new(literal, self.cur_token.clone())),
                 None => {
                     let cause = format!("Expected function parameter, got {:?}", self.cur_token);
                     let error_message = ErrorMessage::new(
@@ -412,14 +413,14 @@ impl Parser {
 
     fn parse_call_expression(&mut self, function: Expr) -> ParserResult<Expr> {
         let arguments = self.parse_call_arguments()?;
-        Ok(Box::new(CallExpression::new(Statement::Expression(function), arguments)))
+        Ok(Box::new(CallExpression::new(Statement::Expression(function), arguments, self.cur_token.clone())))
     }
 
     fn parse_index_expression(&mut self, left: Expr) -> ParserResult<Expr> {
         self.next_token();
         let index = self.parse_expression(OperatorPrecedence::Lowest)?;
         self.expect_next(TokenType::Rbracket)?;
-        Ok(Box::new(IndexExpression::new(left, index)))
+        Ok(Box::new(IndexExpression::new(left, index, self.cur_token.clone())))
     }
 
     fn parse_call_arguments(&mut self) -> ParserResult<Vec<Expr>> {
@@ -482,9 +483,18 @@ mod tests {
         assert_eq!(program.length(), 3);
 
         let test_cases = vec![
-            Statement::Let(Identifier::new("x"), Box::new(Integer::new(5))),
-            Statement::Let(Identifier::new("y"), Box::new(Integer::new(10))),
-            Statement::Let(Identifier::new("foobar"), Box::new(Integer::new(838383))),
+            Statement::Let(
+                Identifier::new("x", Token::new(TokenType::Ident, Some("x".to_string()), 2, 13)),
+                Box::new(Integer::new(5, Token::new(TokenType::Int, Some("5".to_string()), 2, 17)))
+            ),
+            Statement::Let(
+                Identifier::new("y", Token::new(TokenType::Ident, Some("y".to_string()), 3, 13)),
+                Box::new(Integer::new(10, Token::new(TokenType::Int, Some("10".to_string()), 3, 17)))
+            ),
+            Statement::Let(
+                Identifier::new("foobar", Token::new(TokenType::Ident, Some("foobar".to_string()), 4, 13)),
+                Box::new(Integer::new(838383, Token::new(TokenType::Int, Some("838383".to_string()), 4, 22)))
+            ),
         ];
         for (stmt, expected) in program.statements.into_iter().zip(test_cases) {
             assert_eq!(stmt, expected)
@@ -526,9 +536,9 @@ mod tests {
         assert_eq!(program.statements.len(), 3);
 
         let test_cases = vec![
-            Statement::Return(Box::new(Integer::new(5))),
-            Statement::Return(Box::new(Identifier::new("y"))),
-            Statement::Return(Box::new(Integer::new(838383))),
+            Statement::Return(Box::new(Integer::new(5, Token::new(TokenType::Int, Some("".to_string()), 2, 16)))),
+            Statement::Return(Box::new(Identifier::new("y", Token::new(TokenType::Ident, Some("y".to_string()), 3, 16)))),
+            Statement::Return(Box::new(Integer::new(838383, Token::new(TokenType::Int, Some("838383".to_string()), 4, 16)))),
         ];
 
         assert_eq!(test_cases.len(), program.statements.len());
@@ -549,7 +559,8 @@ mod tests {
         assert_eq!(program.statements.len(), 1);
 
         let expected = crate::ast::Program { statements: vec![
-            crate::ast::Statement::Expression(Box::new(crate::ast::Identifier::new("foobar"))),
+            crate::ast::Statement::Expression(Box::new(crate::ast::Identifier::new(
+                "foobar", Token::new(TokenType::Ident, Some("foobar".to_string()), 1, 1)))),
         ] };
         assert_eq!(program, expected);
     }
@@ -566,7 +577,7 @@ mod tests {
         assert_eq!(program.statements.len(), 1);
 
         let expected = crate::ast::Program { statements: vec![
-            crate::ast::Statement::Expression(Box::new(crate::ast::Integer::new(5))),
+            crate::ast::Statement::Expression(Box::new(crate::ast::Integer::new(5, Token::new(TokenType::Int, Some("5".to_string()), 1, 1)))),
         ] };
         assert_eq!(program, expected);
     }
@@ -583,7 +594,8 @@ mod tests {
         assert_eq!(program.statements.len(), 1);
 
         let expected = crate::ast::Program { statements: vec![
-            crate::ast::Statement::Expression(Box::new(crate::ast::Boolean::new(true))),
+            crate::ast::Statement::Expression(Box::new(crate::ast::Boolean::new(
+                true, Token::new(TokenType::True, Some("true".to_string()), 1, 1)))),
         ] };
         assert_eq!(program, expected);
     }
@@ -600,18 +612,19 @@ mod tests {
         assert_eq!(program.statements.len(), 1);
 
         let expected = crate::ast::Program { statements: vec![
-            crate::ast::Statement::Expression(Box::new(crate::ast::StringLiteral::new("hello world".to_string()))),
+            crate::ast::Statement::Expression(Box::new(crate::ast::StringLiteral::new(
+                "hello world".to_string(), Token::new(TokenType::String, Some("\"hello world\"".to_string()), 1, 1)))),
         ] };
         assert_eq!(program, expected);
     }
 
     #[test]
     fn test_parsing_prefix_expression() {
-        let case_a: Expr = Box::new(Integer::new(5));
-        let case_b: Expr = Box::new(Integer::new(15));
+        let case_a: Expr = Box::new(Integer::new(5, Token::new(TokenType::Int, Some("5".to_string()), 1, 2)));
+        let case_b: Expr = Box::new(Integer::new(15, Token::new(TokenType::Int, Some("15".to_string()), 1, 2)));
         let test_cases = vec![
-            ("!5", PrefixedExpr::new(TokenType::Bang, &case_a)),
-            ("-15", PrefixedExpr::new(TokenType::Minus, &case_b)),
+            ("!5", PrefixedExpr::new(TokenType::Bang, &case_a, Token::new(TokenType::Bang, Some("!".to_string()), 1, 1))),
+            ("-15", PrefixedExpr::new(TokenType::Minus, &case_b, Token::new(TokenType::Minus, Some("-".to_string()), 1, 1))),
         ];
 
         for (input, expected_expression) in test_cases {
@@ -631,19 +644,19 @@ mod tests {
 
     #[test]
     fn test_parsing_infix_expression() {
-        let left: Expr = Box::new(Integer::new(5));
-        let right: Expr = Box::new(Integer::new(5));
+        let left: Expr = Box::new(Integer::new(5, Token::new(TokenType::Int, Some("5".to_string()), 1, 1)));
+        let right: Expr = Box::new(Integer::new(5, Token::new(TokenType::Int, Some("5".to_string()), 1, 5)));
         let test_cases = vec![
-            ("5 + 5", InfixExpr::new(TokenType::Plus, &left, &right)),
-            ("5 - 5", InfixExpr::new(TokenType::Minus, &left, &right)),
-            ("5 * 5", InfixExpr::new(TokenType::Asterisk, &left, &right)),
-            ("5 / 5", InfixExpr::new(TokenType::Slash, &left, &right)),
-            ("5 > 5", InfixExpr::new(TokenType::Gt, &left, &right)),
-            ("5 < 5", InfixExpr::new(TokenType::Lt, &left, &right)),
-            ("5 == 5", InfixExpr::new(TokenType::Eq, &left, &right)),
-            ("5 != 5", InfixExpr::new(TokenType::NotEq, &left, &right)),
-            ("5 <= 5", InfixExpr::new(TokenType::LtE, &left, &right)),
-            ("5 >= 5", InfixExpr::new(TokenType::GtE, &left, &right)),
+            ("5 + 5", InfixExpr::new(TokenType::Plus, &left, &right, Token::new(TokenType::Plus, Some("+".to_string()), 1, 3))),
+            ("5 - 5", InfixExpr::new(TokenType::Minus, &left, &right, Token::new(TokenType::Minus, Some("-".to_string()), 1, 3))),
+            ("5 * 5", InfixExpr::new(TokenType::Asterisk, &left, &right, Token::new(TokenType::Asterisk, Some("*".to_string()), 1, 3))),
+            ("5 / 5", InfixExpr::new(TokenType::Slash, &left, &right, Token::new(TokenType::Slash, Some("/".to_string()), 1, 3))),
+            ("5 > 5", InfixExpr::new(TokenType::Gt, &left, &right, Token::new(TokenType::Gt, Some(">".to_string()), 1, 3))),
+            ("5 < 5", InfixExpr::new(TokenType::Lt, &left, &right, Token::new(TokenType::Lt, Some("<".to_string()), 1, 3))),
+            ("5 == 5", InfixExpr::new(TokenType::Eq, &left, &right, Token::new(TokenType::Eq, Some("==".to_string()), 1, 3))),
+            ("5 != 5", InfixExpr::new(TokenType::NotEq, &left, &right, Token::new(TokenType::NotEq, Some("!=".to_string()), 1, 3))),
+            ("5 <= 5", InfixExpr::new(TokenType::LtE, &left, &right, Token::new(TokenType::LtE, Some("<=".to_string()), 1, 3))),
+            ("5 >= 5", InfixExpr::new(TokenType::GtE, &left, &right, Token::new(TokenType::GtE, Some(">=".to_string()), 1, 3))),
         ];
 
         for (input, expected_expression) in test_cases {
@@ -710,13 +723,17 @@ mod tests {
         assert!(p.errors.is_empty());
         assert_eq!(program.statements.len(), 1);
 
-        let x: Expr = Box::new(Identifier::new("x"));
-        let y: Expr = Box::new(Identifier::new("y"));
-        let condition: Expr = Box::new(InfixExpr::new(TokenType::Lt, &x, &y));
+        let x: Expr = Box::new(Identifier::new("x", Token::new(TokenType::Ident, Some("x".to_string()), 1, 5)));
+        let y: Expr = Box::new(Identifier::new("y", Token::new(TokenType::Ident, Some("y".to_string()), 1, 9)));
+        let condition: Expr = Box::new(InfixExpr::new(
+            TokenType::Lt, &x, &y,
+            Token::new(TokenType::Lt, Some("<".to_string()), 1, 7)
+        ));
         let expression: Expr = Box::new(IfExpr::new(
             &condition,
             Statement::Block(vec![Statement::Expression(x)]),
-            None
+            None,
+            Token::new(TokenType::If, Some("if".to_string()), 1, 1)
         ));
         let expected = Program { statements: vec![
             Statement::Expression(expression)
@@ -735,13 +752,17 @@ mod tests {
         assert!(p.errors.is_empty());
         assert_eq!(program.statements.len(), 1);
 
-        let x: Expr = Box::new(Identifier::new("x"));
-        let y: Expr = Box::new(Identifier::new("y"));
-        let condition: Expr = Box::new(InfixExpr::new(TokenType::Lt, &x, &y));
+        let x: Expr = Box::new(Identifier::new("x", Token::new(TokenType::Ident, Some("x".to_string()), 1, 5)));
+        let y: Expr = Box::new(Identifier::new("y", Token::new(TokenType::Ident, Some("y".to_string()), 1, 9)));
+        let condition: Expr = Box::new(InfixExpr::new(
+            TokenType::Lt, &x, &y,
+            Token::new(TokenType::Lt, Some("<".to_string()), 1, 7)
+        ));
         let expression: Expr = Box::new(IfExpr::new(
             &condition,
             Statement::Block(vec![Statement::Expression(x)]),
             Some(Statement::Block(vec![Statement::Expression(y)])),
+            Token::new(TokenType::If, Some("if".to_string()), 1, 1)
         ));
         let expected = crate::ast::Program { statements: vec![
             Statement::Expression(expression)
@@ -760,17 +781,19 @@ mod tests {
         assert!(p.errors.is_empty());
         assert_eq!(program.statements.len(), 1);
 
-        let x = Identifier::new("x");
+        let x = Identifier::new("x", Token::new(TokenType::Ident, Some("x".to_string()), 1, 4));
         let x_expr: Expr = Box::new(x.clone());
-        let y = Identifier::new("y");
+        let y = Identifier::new("y", Token::new(TokenType::Ident, Some("y".to_string()), 1, 7));
         let y_expr: Expr = Box::new(y.clone());
         let returned_expression: Expr = Box::new(InfixExpr::new(
-            TokenType::Plus, &x_expr, &y_expr
+            TokenType::Plus, &x_expr, &y_expr,
+            Token::new(TokenType::Plus, Some("+".to_string()), 1, 20)
         ));
         let expression: Expr = Box::new(FunctionLiteral::new(
             vec![x, y], Statement::Block(vec![
                 Statement::Return(returned_expression)
-            ])
+            ]),
+            Token::new(TokenType::Function, Some("fn".to_string()), 1, 1)
         ));
         let expected = Program { statements: vec![
             Statement::Expression(expression)
@@ -789,24 +812,30 @@ mod tests {
         assert!(p.errors.is_empty());
         assert_eq!(program.statements.len(), 1);
 
-        let function: Expr = Box::new(Identifier::new("add"));
-        let first: Expr = Box::new(Integer::new(1));
-        let second_left: Expr = Box::new(Integer::new(2));
-        let second_right: Expr = Box::new(Integer::new(3));
+        let function: Expr = Box::new(Identifier::new("add", Token::new(TokenType::Ident, Some("add".to_string()), 1, 1)));
+        let first: Expr = Box::new(Integer::new(1, Token::new(TokenType::Int, Some("1".to_string()), 1, 5)));
+        let second_left: Expr = Box::new(Integer::new(2, Token::new(TokenType::Int, Some("2".to_string()), 1, 7)));
+        let second_right: Expr = Box::new(Integer::new(3, Token::new(TokenType::Int, Some("3".to_string()), 1, 11)));
         let second: Expr = Box::new(InfixExpr::new(
             TokenType::Asterisk,
             &second_left,
             &second_right,
+            Token::new(TokenType::Asterisk, Some("*".to_string()), 1, 9)
         ));
-        let third_left: Expr = Box::new(Integer::new(4));
-        let third_right: Expr = Box::new(Integer::new(5));
+        let third_left: Expr = Box::new(Integer::new(4, Token::new(TokenType::Int, Some("4".to_string()), 1, 14)));
+        let third_right: Expr = Box::new(Integer::new(5, Token::new(TokenType::Int, Some("5".to_string()), 1, 18)));
         let third: Expr = Box::new(InfixExpr::new(
             TokenType::Plus,
             &third_left,
             &third_right,
+            Token::new(TokenType::Plus, Some("+".to_string()), 1, 16)
         ));
         let arguments: Vec<Expr> = vec![ first, second, third ];
-        let expression: Expr = Box::new(CallExpression::new(Statement::Expression(function), arguments));
+        let expression: Expr = Box::new(CallExpression::new(
+            Statement::Expression(function),
+            arguments,
+            Token::new(TokenType::Lparen, Some("(".to_string()), 1, 4)
+        ));
         let expectation = Program { statements: vec![
             Statement::Expression(expression)
         ] };
@@ -824,22 +853,27 @@ mod tests {
         assert!(p.errors.is_empty());
         assert_eq!(program.statements.len(), 1);
 
-        let first: Expr = Box::new(Integer::new(1));
-        let first_infix_left_item: Expr = Box::new(Integer::new(2));
-        let first_infix_right_item: Expr = Box::new(Integer::new(2));
+        let first: Expr = Box::new(Integer::new(1, Token::new(TokenType::Int, Some("1".to_string()), 1, 2)));
+        let first_infix_left_item: Expr = Box::new(Integer::new(2, Token::new(TokenType::Int, Some("2".to_string()), 1, 5)));
+        let first_infix_right_item: Expr = Box::new(Integer::new(2, Token::new(TokenType::Int, Some("2".to_string()), 1, 9)));
         let second: Expr = Box::new(InfixExpr::new(
             TokenType::Asterisk,
             &first_infix_left_item,
             &first_infix_right_item,
+            Token::new(TokenType::Asterisk, Some("*".to_string()), 1, 7)
         ));
-        let second_infix_left_item: Expr = Box::new(Integer::new(3));
-        let second_infix_right_item: Expr = Box::new(Integer::new(3));
+        let second_infix_left_item: Expr = Box::new(Integer::new(3, Token::new(TokenType::Int, Some("3".to_string()), 1, 12)));
+        let second_infix_right_item: Expr = Box::new(Integer::new(3, Token::new(TokenType::Int, Some("3".to_string()), 1, 16)));
         let third: Expr = Box::new(InfixExpr::new(
             TokenType::Plus,
             &second_infix_left_item,
             &second_infix_right_item,
+            Token::new(TokenType::Plus, Some("+".to_string()), 1, 16)
         ));
-        let arr = ArrayLiteral::new(vec![first, second, third]);
+        let arr = ArrayLiteral::new(
+            vec![first, second, third],
+            Token::new(TokenType::Lbrace, Some("[".to_string()), 1, 1)
+        );
         let expectation = Program { statements: vec![
             Statement::Expression(Box::new(arr))
         ]};

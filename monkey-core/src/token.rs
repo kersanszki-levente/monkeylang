@@ -83,7 +83,7 @@ impl Display for TokenType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {
     pub(crate) r#type: TokenType,
     pub(crate) literal: Option<String>,

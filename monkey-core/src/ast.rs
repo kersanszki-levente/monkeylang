@@ -5,10 +5,12 @@ use std::ops::Deref;
 use crate::builtin::BuiltinFunction;
 use crate::environment::SharedEnvironment;
 use crate::evaluator::Evaluate;
+use crate::token::Token;
 use crate::token::TokenType;
 
 pub trait Expression: Display + Debug + Evaluate {
     fn value(&self) -> Value;
+    fn token(&self) -> &Token;
     fn token_type(&self) -> TokenType;
     fn literal(&self) -> &str;
     fn box_clone(&self) -> Box<dyn Expression>;
@@ -233,6 +235,7 @@ impl From<Statement> for String {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Identifier {
     value: String,
+    token: Token,
 }
 
 impl Display for Identifier {
@@ -242,14 +245,17 @@ impl Display for Identifier {
 }
 
 impl Identifier {
-    pub(crate) fn new(value: &str) -> Identifier {
-        Identifier { value: value.to_owned() }
+    pub(crate) fn new(value: &str, token: Token) -> Identifier {
+        Identifier { value: value.to_owned(), token }
     }
 }
 
 impl Expression for Identifier {
     fn value(&self) -> Value {
         Value::Str(self.value.clone())
+    }
+    fn token(&self) -> &Token {
+        &self.token
     }
     fn token_type(&self) -> TokenType {
         TokenType::Ident
@@ -268,21 +274,10 @@ impl From<Identifier> for String {
     }
 }
 
-impl From<&str> for Identifier {
-    fn from(value: &str) -> Self {
-        Identifier::new(value)
-    }
-}
-
-impl From<String> for Identifier {
-    fn from(value: String) -> Self {
-        Identifier::new(&value)
-    }
-}
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct Boolean {
     value: bool,
+    token: Token,
 }
 
 const TRUE_LITERAL: &str = "true";
@@ -295,14 +290,17 @@ impl Display for Boolean {
 }
 
 impl Boolean {
-    pub(crate) fn new(value: bool) -> Boolean {
-        Boolean { value }
+    pub(crate) fn new(value: bool, token: Token) -> Boolean {
+        Boolean { value, token }
     }
 }
 
 impl Expression for Boolean {
     fn value(&self) -> Value {
         Value::Bool(self.value)
+    }
+    fn token(&self) -> &Token {
+        &self.token
     }
     fn token_type(&self) -> TokenType {
         TokenType::Ident
@@ -322,13 +320,14 @@ impl Expression for Boolean {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct Integer {
     pub(crate) value: i64,
+    token: Token,
     literal: String,
 }
 
 impl Integer {
-    pub(crate) fn new(value: i64) -> Integer {
+    pub(crate) fn new(value: i64, token: Token) -> Integer {
         let literal = format!("{value}");
-        Integer { value, literal }
+        Integer { value, token, literal }
     }
 }
 
@@ -341,6 +340,9 @@ impl Display for Integer {
 impl Expression for Integer {
     fn value(&self) -> Value {
         Value::Int(self.value)
+    }
+    fn token(&self) -> &Token {
+        &self.token
     }
     fn token_type(&self) -> TokenType {
         TokenType::Int
@@ -355,12 +357,13 @@ impl Expression for Integer {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct StringLiteral {
-    value: String
+    value: String,
+    token: Token
 }
 
 impl StringLiteral {
-    pub(crate) fn new(value: String) -> StringLiteral {
-        StringLiteral { value }
+    pub(crate) fn new(value: String, token: Token) -> StringLiteral {
+        StringLiteral { value, token }
     }
 }
 
@@ -373,6 +376,9 @@ impl Display for StringLiteral {
 impl Expression for StringLiteral {
     fn value(&self) -> Value {
         Value::Str(self.value.clone())
+    }
+    fn token(&self) -> &Token {
+        &self.token
     }
     fn token_type(&self) -> TokenType {
         TokenType::String
@@ -388,13 +394,14 @@ impl Expression for StringLiteral {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct ArrayLiteral {
     pub(crate) elements: Vec<Expr>,
+    token: Token,
     literal: String,
 }
 
 impl ArrayLiteral {
-    pub(crate) fn new(elements: Vec<Expr>) -> ArrayLiteral {
+    pub(crate) fn new(elements: Vec<Expr>, token: Token) -> ArrayLiteral {
         let literal = format!("[{}]", elements.iter().map(|e| format!("{e}")).collect::<Vec<String>>().join(", "));
-        ArrayLiteral { elements, literal }
+        ArrayLiteral { elements, token, literal }
     }
 }
 
@@ -407,6 +414,9 @@ impl Display for ArrayLiteral {
 impl Expression for ArrayLiteral {
     fn value(&self) -> Value {
         Value::Expression(self.box_clone())
+    }
+    fn token(&self) -> &Token {
+        &self.token
     }
     fn token_type(&self) -> TokenType {
         TokenType::Lbracket
@@ -423,15 +433,17 @@ impl Expression for ArrayLiteral {
 pub(crate) struct IndexExpression {
     pub(crate) left: Value,
     pub(crate) index: Value,
+    token: Token,
     literal: String,
 }
 
 impl IndexExpression {
-    pub(crate) fn new(left: Expr, index: Expr) -> IndexExpression {
+    pub(crate) fn new(left: Expr, index: Expr, token: Token) -> IndexExpression {
         let literal = format!("({left}[{index}])");
         IndexExpression {
             left: Value::Expression(left.clone()),
             index: Value::Expression(index.clone()),
+            token,
             literal
         }
     }
@@ -446,6 +458,9 @@ impl Display for IndexExpression {
 impl Expression for IndexExpression {
     fn value(&self) -> Value {
         Value::Int(1)
+    }
+    fn token(&self) -> &Token {
+        &self.token
     }
     fn token_type(&self) -> TokenType {
         TokenType::Lbracket
@@ -462,13 +477,14 @@ impl Expression for IndexExpression {
 pub(crate) struct PrefixedExpr {
     pub(crate) operator: TokenType,
     pub(crate) right: Value,
+    token: Token,
     literal: String,
 }
 
 impl PrefixedExpr {
-    pub(crate) fn new(operator: TokenType, right: &Expr) -> PrefixedExpr {
+    pub(crate) fn new(operator: TokenType, right: &Expr, token: Token) -> PrefixedExpr {
         let literal = format!("{operator}{right}");
-        PrefixedExpr { operator, right: Value::Expression(right.clone()), literal }
+        PrefixedExpr { operator, right: Value::Expression(right.clone()), token, literal }
     }
 }
 
@@ -481,6 +497,9 @@ impl Display for PrefixedExpr {
 impl Expression for PrefixedExpr {
     fn value(&self) -> Value {
         self.right.clone()
+    }
+    fn token(&self) -> &Token {
+        &self.token
     }
     fn token_type(&self) -> TokenType {
         self.operator.clone()
@@ -498,16 +517,18 @@ pub(crate) struct InfixExpr {
     pub(crate) operator: TokenType,
     pub(crate) left: Value,
     pub(crate) right: Value,
+    token: Token,
     literal: String,
 }
 
 impl InfixExpr {
-    pub(crate) fn new(operator: TokenType, left: &Expr, right: &Expr) -> InfixExpr {
+    pub(crate) fn new(operator: TokenType, left: &Expr, right: &Expr, token: Token) -> InfixExpr {
         let literal = format!("({left} {operator} {right})");
         InfixExpr {
             operator,
             left: Value::Expression(left.clone()),
             right: Value::Expression(right.clone()),
+            token,
             literal,
         }
     }
@@ -522,6 +543,9 @@ impl Display for InfixExpr {
 impl Expression for InfixExpr {
     fn value(&self) -> Value {
         Value::Expression(self.box_clone())
+    }
+    fn token(&self) -> &Token {
+        &self.token
     }
     fn token_type(&self) -> TokenType {
         self.operator.clone()
@@ -539,11 +563,12 @@ pub(crate) struct IfExpr {
     pub(crate) condition: Value,
     pub(crate) consequence: Statement,
     pub(crate) alternative: Option<Statement>,
+    token: Token,
     literal: String,
 }
 
 impl IfExpr {
-    pub(crate) fn new(condition: &Expr, consequence: Statement, alternative: Option<Statement>) -> IfExpr {
+    pub(crate) fn new(condition: &Expr, consequence: Statement, alternative: Option<Statement>, token: Token) -> IfExpr {
         let mut literal = format!("if {} {}", condition, consequence);
         if let Some(ref alternative_block) = alternative.as_ref() {
             literal.push_str(&format!("else {alternative_block}"));
@@ -552,6 +577,7 @@ impl IfExpr {
             condition: Value::Expression(condition.clone()),
             consequence,
             alternative,
+            token,
             literal,
         }
     }
@@ -566,6 +592,9 @@ impl Display for IfExpr {
 impl Expression for IfExpr {
     fn value(&self) -> Value {
         Value::Expression(self.box_clone())
+    }
+    fn token(&self) -> &Token {
+        &self.token
     }
     fn token_type(&self) -> TokenType {
         TokenType::If
@@ -582,11 +611,12 @@ impl Expression for IfExpr {
 pub(crate) struct FunctionLiteral {
     pub(crate) parameters: Vec<Identifier>,
     pub(crate) body: Statement,
+    token: Token,
     literal: String,
 }
 
 impl FunctionLiteral {
-    pub(crate) fn new(parameters: Vec<Identifier>, body: Statement) -> FunctionLiteral {
+    pub(crate) fn new(parameters: Vec<Identifier>, body: Statement, token: Token) -> FunctionLiteral {
         let mut params: Vec<String> = vec![];
         for param in parameters.iter() {
             params.push(format!("{param}"));
@@ -596,7 +626,7 @@ impl FunctionLiteral {
             params.join(", "),
             body
         );
-        FunctionLiteral { parameters, body, literal }
+        FunctionLiteral { parameters, body, token, literal }
     }
 }
 
@@ -609,6 +639,9 @@ impl Display for FunctionLiteral {
 impl Expression for FunctionLiteral {
     fn value(&self) -> Value {
         Value::Expression(self.box_clone())
+    }
+    fn token(&self) -> &Token {
+        &self.token
     }
     fn token_type(&self) -> TokenType {
         TokenType::Function
@@ -625,6 +658,7 @@ impl Expression for FunctionLiteral {
 pub struct CallExpression {
     pub(crate) function: Statement,
     pub(crate) arguments: Vec<Expr>,
+    token: Token,
     literal: String,
 }
 
@@ -636,10 +670,10 @@ impl PartialEq for CallExpression {
 }
 
 impl CallExpression {
-    pub(crate) fn new(function: Statement, arguments: Vec<Expr>) -> CallExpression {
+    pub(crate) fn new(function: Statement, arguments: Vec<Expr>, token: Token) -> CallExpression {
         let args_literal = arguments.iter().map(|a| a.literal().to_string()).collect::<Vec<String>>().join(", ");
         let literal = format!("{function}({args_literal})");
-        CallExpression { function, arguments, literal }
+        CallExpression { function, arguments, token, literal }
     }
 }
 
@@ -652,6 +686,9 @@ impl Display for CallExpression {
 impl Expression for CallExpression {
     fn value(&self) -> Value {
         Value::Expression(self.box_clone())
+    }
+    fn token(&self) -> &Token {
+        &self.token
     }
     fn token_type(&self) -> TokenType {
         TokenType::Function
@@ -709,8 +746,14 @@ mod tests {
     fn test_program_rendering() {
         let program = Program { statements: vec![
             Statement::Let(
-                "my_var".into(),
-                Box::new(Identifier::new("another_var"))
+                Identifier::new(
+                    "my_var",
+                    Token::new(TokenType::Ident, Some("my_var".to_string()), 1, 5)
+                ),
+                Box::new(Identifier::new(
+                    "another_var",
+                    Token::new(TokenType::Ident, Some("another_var".to_string()), 1, 13)
+                ))
             ),
         ] };
         let result: String = program.into();
