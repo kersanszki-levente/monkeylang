@@ -16,6 +16,7 @@ use crate::ast::PrefixedExpr;
 use crate::ast::Program;
 use crate::ast::Statement;
 use crate::ast::StringLiteral;
+use crate::error::ErrorMessage;
 use crate::lexer::Lexer;
 use crate::token::Token;
 use crate::token::TokenType;
@@ -53,19 +54,7 @@ impl From<TokenType> for OperatorPrecedence {
 }
 
 #[derive(Debug, Clone)]
-pub struct ParserError(String);
-
-impl From<&str> for ParserError {
-    fn from(value: &str) -> Self {
-        ParserError(value.to_owned())
-    }
-}
-
-impl From<String> for ParserError {
-    fn from(value: String) -> Self {
-        ParserError(value)
-    }
-}
+pub struct ParserError(ErrorMessage);
 
 impl Display for ParserError {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
@@ -115,7 +104,15 @@ impl Parser {
             self.next_token();
             Ok(())
         } else {
-            Err(format!("Expected {:?} after {:?}", t, self.cur_token.r#type).into())
+            let cause = format!("Expected {:?} after {:?}", t, self.cur_token.r#type);
+            let error_message = ErrorMessage::new(
+                &self.lexer.input,
+                "stdin",
+                self.cur_token.row_position,
+                self.cur_token.col_position,
+                &cause
+            );
+            Err(ParserError(error_message))
         }
     }
 
@@ -173,7 +170,17 @@ impl Parser {
             TokenType::If => self.parse_if_expression()?,
             TokenType::Function => self.parse_function_literal()?,
             TokenType::Lbracket => Box::new(self.parse_array_literal()?),
-            _ => return Err(ParserError(format!("{} is not a valid operator", self.cur_token.r#type)))
+            _ => {
+                let cause = format!("{} is not a valid operator", self.cur_token.r#type);
+                let error_message = ErrorMessage::new(
+                    &self.lexer.input,
+                    "stdin",
+                    self.cur_token.row_position,
+                    self.cur_token.col_position,
+                    &cause
+                );
+                return Err(ParserError(error_message))
+            }
         };
         while !self.next_token_is(&TokenType::Semicolon) && precedence < self.next_precedence() {
             let next_token_type = self.next_token.r#type.clone();
@@ -214,9 +221,29 @@ impl Parser {
             Some(literal) => {
                 literal
                 .parse()
-                .map_err(|_| ParserError(format!("Failed to parse {} as integer", &literal)))?
+                .map_err(|_| {
+                        let cause = format!("Failed to parse {} as integer", &literal);
+                        let error_message = ErrorMessage::new(
+                            &self.lexer.input,
+                            "stdin",
+                            self.cur_token.row_position,
+                            self.cur_token.col_position,
+                            &cause
+                        );
+                        ParserError(error_message)
+                    })?
             },
-            None => return Err(ParserError("Failed to parse integer".to_string())),
+            None => {
+                let cause = "Failed to parse integer".to_string();
+                let error_message = ErrorMessage::new(
+                    &self.lexer.input,
+                    "stdin",
+                    self.cur_token.row_position,
+                    self.cur_token.col_position,
+                    &cause
+                );
+                return Err(ParserError(error_message))
+            },
         };
         Ok(Integer::new(value))
     }
@@ -225,7 +252,15 @@ impl Parser {
         if let Some(literal) = &self.cur_token.literal {
             Ok(StringLiteral::new(literal.to_string()))
         } else {
-            Err(ParserError("Failed to parse string".to_string()))
+            let cause = "Failed to parse string".to_string();
+            let error_message = ErrorMessage::new(
+                &self.lexer.input,
+                "stdin",
+                self.cur_token.row_position,
+                self.cur_token.col_position,
+                &cause
+            );
+            Err(ParserError(error_message))
         }
     }
 
@@ -338,9 +373,17 @@ impl Parser {
 
         match &self.cur_token.literal {
             Some(literal) => parameters.push(Identifier::new(literal)),
-            None => return Err(
-                ParserError(format!("Expected function parameter, got {:?}", self.cur_token))
-            )
+            None => {
+                let cause = format!("Expected function parameter, got {:?}", self.cur_token);
+                let error_message = ErrorMessage::new(
+                    &self.lexer.input,
+                    "stdin",
+                    self.cur_token.row_position,
+                    self.cur_token.col_position,
+                    &cause
+                );
+                return Err(ParserError(error_message))
+            }
         };
 
         while self.next_token_is(&TokenType::Comma) {
@@ -348,9 +391,17 @@ impl Parser {
             self.next_token();
             match &self.cur_token.literal {
                 Some(literal) => parameters.push(Identifier::new(literal)),
-                None => return Err(
-                    ParserError(format!("Expected function parameter, got {:?}", self.cur_token))
-                )
+                None => {
+                    let cause = format!("Expected function parameter, got {:?}", self.cur_token);
+                    let error_message = ErrorMessage::new(
+                        &self.lexer.input,
+                        "stdin",
+                        self.cur_token.row_position,
+                        self.cur_token.col_position,
+                        &cause
+                    );
+                    return Err(ParserError(error_message))
+                }
             };
         }
 
