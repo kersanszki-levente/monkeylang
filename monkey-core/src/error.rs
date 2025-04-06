@@ -1,7 +1,8 @@
 use std::fmt::Debug;
+use std::fmt::Display;
 
-#[derive(PartialEq)]
-struct ErrorMessage(String);
+#[derive(Clone, PartialEq)]
+pub struct ErrorMessage(String);
 
 impl Debug for ErrorMessage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -9,8 +10,14 @@ impl Debug for ErrorMessage {
     }
 }
 
+impl Display for ErrorMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl ErrorMessage {
-    fn new(source: &str, file: &str, row: usize, col: usize, cause: &str) -> ErrorMessage {
+    pub fn new(source: &str, file: &str, row: usize, col: usize, cause: &str) -> ErrorMessage {
         let mut extract = String::new();
         extract.push_str(&format!("{file}:\n"));
         for (i, line) in source.lines().enumerate() {
