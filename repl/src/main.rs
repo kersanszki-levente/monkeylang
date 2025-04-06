@@ -73,7 +73,7 @@ fn evaluate(source: &str, env: &SharedEnvironment) -> RuntimeResult<Value> {
     let mut parser = Parser::new(lexer);
     let program = parser.parse();
     if let Some(err) = parser.errors.first() {
-        return Err(RuntimeError(format!("Parsing error: {}", err)));
+        return Err(RuntimeError(format!("{err}")));
     };
     program.eval(env).map_err(|err| RuntimeError(format!("{err}")))
 }
