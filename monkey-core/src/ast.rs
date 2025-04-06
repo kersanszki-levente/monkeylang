@@ -592,7 +592,7 @@ impl FunctionLiteral {
             params.push(format!("{param}"));
         }
         let literal = format!(
-            "fn ({:?}) {{ {} }}",
+            "fn ({}) {{ {} }}",
             params.join(", "),
             body
         );
