@@ -2,7 +2,7 @@ use crate::token::{Token, TokenType};
 
 #[derive(Debug)]
 pub struct Lexer {
-    input: String,
+    pub(crate) input: String,
     position: usize,
     read_position: usize,
     row_position: usize,
