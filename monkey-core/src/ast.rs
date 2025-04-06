@@ -58,7 +58,7 @@ impl Display for Value {
             Value::Array(elements) => {
                 &format!("[{}]", elements.iter().map(|e| format!("{e}")).collect::<Vec<String>>().join(", "))
             }
-            Value::Builtin(_) => &format!("builtin function"),
+            Value::Builtin(_) => "builtin function",
             Value::Null => "NULL",
         };
         write!(f, "{}", literal)
